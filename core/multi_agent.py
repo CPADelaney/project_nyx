@@ -1,10 +1,13 @@
 # src/multi_agent.py
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sys
 import os
 import json
 import openai
 import subprocess
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from core.personality import get_personality
 from src.task_priority import load_task_priorities  # ✅ Fix: Import task prioritization
 
