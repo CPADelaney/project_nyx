@@ -89,7 +89,8 @@ jobs:
         run: |
           git config --global user.name "nyx-ai"
           git config --global user.email "nyx@self-improving.ai"
-          git add src/nyx_core.py logs/feature_expansion/*.py || true
+          # Stage the core file and the feature expansion output (JSON)
+          git add src/nyx_core.py logs/feature_expansion.json || true
           git diff --quiet && git diff --staged --quiet || git commit -m "AI-generated new feature expansion applied"
           git push origin main || true
 
