@@ -1,15 +1,13 @@
 # tracking/goal_generator.py
 
 import os
-import json
+import sqlite3
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import datetime
 import random
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-PERFORMANCE_LOG = "logs/performance_history.json"
-BOTTLENECK_LOG = "logs/bottleneck_functions.json"
-GOAL_LOG = "logs/autonomous_goals.json"
-EVOLUTION_LOG = "logs/evolution_roadmap.json"
+LOG_DB = "logs/ai_logs.db"
 
 class GoalGenerator:
     """Manages AI’s evolving self-improvement roadmap based on performance trends and autonomous expansion plans."""
@@ -19,6 +17,7 @@ class GoalGenerator:
         self.evolution_plans = []
         self._load_existing_goals()
         self._load_existing_evolution_plans()
+        initialize_log_db() 
 
     def _load_existing_goals(self):
         """Loads previous self-improvement goals to maintain long-term tracking."""
@@ -40,20 +39,20 @@ class GoalGenerator:
 
     def analyze_trends(self):
         """Identifies recurring inefficiencies and predicts necessary improvements."""
-        if not os.path.exists(PERFORMANCE_LOG):
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+
+        # Retrieve slowest functions from the database
+        c.execute("SELECT function_name FROM optimization_logs ORDER BY execution_time DESC LIMIT 50")
+        slow_functions = [row[0] for row in c.fetchall()]
+
+        c.execute("SELECT function_name, dependency FROM optimization_logs WHERE dependency IS NOT NULL")
+        dependencies = {row[0]: row[1] for row in c.fetchall()}
+        conn.close()
+
+        if not slow_functions:
             print("⚠️ No performance history found. Skipping trend analysis.")
             return [], {}
-
-        with open(PERFORMANCE_LOG, "r", encoding="utf-8") as file:
-            history = json.load(file)
-
-        slow_functions = []
-        dependencies = {}  # Track which functions depend on others
-        for entry in history:
-            if "slowest_functions" in entry:
-                slow_functions.extend(entry["slowest_functions"])
-            if "dependency_links" in entry:
-                dependencies.update(entry["dependency_links"])
 
         counter = Counter(slow_functions)
         recurring_issues = [func for func, count in counter.items() if count > 3]  # More than 3 slowdowns
@@ -71,24 +70,18 @@ class GoalGenerator:
             print("✅ No recurring inefficiencies detected. No new goals generated.")
             return
 
-        new_goals = []
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+
         for func in recurring_issues:
-            goal = {
-                "goal": f"Redesign {func} to improve execution efficiency",
-                "target_function": func,
-                "priority": "high" if func in dependencies else "medium",
-                "dependency": dependencies.get(func, None),
-                "last_updated": str(datetime.utcnow())
-            }
-            new_goals.append(goal)
+            priority = "high" if func in dependencies else "medium"
+            c.execute("INSERT INTO goals (timestamp, goal, target_function, priority, dependency, status) VALUES (datetime('now'), ?, ?, ?, ?, ?)",
+                      (f"Redesign {func} to improve execution efficiency", func, priority, dependencies.get(func, None), "pending"))
 
-        # Merge with existing goals to prevent redundant tasks
-        self._update_existing_goals(new_goals)
+        conn.commit()
+        conn.close()
 
-        with open(GOAL_LOG, "w", encoding="utf-8") as file:
-            json.dump(self.goals, file, indent=4)
-
-        print(f"📌 Generated {len(new_goals)} long-term self-improvement goals.")
+        print(f"📌 Generated {len(recurring_issues)} long-term self-improvement goals.")
 
     def _update_existing_goals(self, new_goals):
         """Ensures ongoing goals are maintained and updated rather than overwritten."""
@@ -113,29 +106,26 @@ class GoalGenerator:
         ]
 
         selected_expansion = random.choice(potential_expansions)
-        evolution_task = {
-            "evolution_goal": selected_expansion,
-            "priority": "high",
-            "status": "pending",
-            "last_updated": str(datetime.utcnow())
-        }
-
-        self.evolution_plans.append(evolution_task)
-
-        with open(EVOLUTION_LOG, "w", encoding="utf-8") as file:
-            json.dump(self.evolution_plans, file, indent=4)
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO goals (timestamp, goal, priority, status) VALUES (datetime('now'), ?, ?, ?)",
+                  (selected_expansion, "high", "pending"))
+        conn.commit()
+        conn.close()
 
         print(f"🚀 AI Evolution Task Added: {selected_expansion}")
 
     def review_goals(self):
         """Displays all currently active self-improvement and expansion goals."""
-        print("\n📖 AI Self-Improvement Roadmap:")
-        for goal in self.goals:
-            print(f"🔹 {goal['goal']} (Priority: {goal['priority']}, Last Updated: {goal['last_updated']})")
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT goal, priority, status, timestamp FROM goals ORDER BY timestamp DESC")
+        goals = c.fetchall()
+        conn.close()
 
-        print("\n🚀 AI Evolution Plan:")
-        for plan in self.evolution_plans:
-            print(f"⚡ {plan['evolution_goal']} (Priority: {plan['priority']}, Status: {plan['status']})")
+        print("\n📖 AI Self-Improvement Roadmap:")
+        for goal, priority, status, timestamp in goals:
+            print(f"🔹 {goal} (Priority: {priority}, Status: {status}, Last Updated: {timestamp})")
 
 if __name__ == "__main__":
     goal_generator = GoalGenerator()
