@@ -5,11 +5,8 @@ import os
 import json
 import openai
 import subprocess
-from src.personality import get_personality
+from core.personality import get_personality
 from src.task_priority import load_task_priorities  # ✅ Fix: Import task prioritization
-
-# Ensure `src/` is in the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 AGENT_CONFIG = "core/agents.json"  # ✅ Fix: Corrected path
 ANALYSIS_LOG = "logs/code_analysis.log"
