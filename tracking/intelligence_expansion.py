@@ -1,13 +1,12 @@
 # tracking/intelligence_expansion.py
 
 import os
-import json
+import sqlite3
 import subprocess
-import threading
-import time
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-INTELLIGENCE_LOG = "logs/intelligence_expansion.json"
+LOG_DB = "logs/ai_logs.db"
 EVOLUTION_INTERVAL = 10  # Time in seconds between intelligence expansion cycles
 
 class AIEvolution:
@@ -21,6 +20,7 @@ class AIEvolution:
             "new_cognitive_layers": []
         }
         self._load_existing_log()
+        initialize_log_db()  # Ensure the database is initialized
 
     def _load_existing_log(self):
         """Loads previous AI intelligence expansion data."""
@@ -45,33 +45,43 @@ class AIEvolution:
         except Exception as e:
             print(f"⚠️ Intelligence structure analysis failed: {str(e)}")
 
-        self.status["architectural_refinements"].extend(refinements)
-        self._save_log()
-
+        # Store refinements in SQLite
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        for refinement in refinements:
+            c.execute("INSERT INTO intelligence_expansion (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                      ("architectural_refinement", refinement))
+        conn.commit()
+        conn.close()
+        
     def introduce_cognitive_layer(self):
         """Dynamically generates and integrates new intelligence processing layers."""
-        new_layer = {
-            "layer_name": f"Cognitive Layer {self.status['evolution_cycles'] + 1}",
-            "function": "Enhance abstract reasoning and multi-variable analysis.",
-            "created_at": str(datetime.utcnow())
-        }
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
 
-        self.status["new_cognitive_layers"].append(new_layer)
-        self.status["evolution_cycles"] += 1
-        self._save_log()
+        # Determine the latest evolution cycle
+        c.execute("SELECT COUNT(*) FROM intelligence_expansion WHERE event_type='cognitive_layer'")
+        evolution_cycles = c.fetchone()[0]
 
-        print(f"🚀 AI intelligence expansion: New layer added → {new_layer['layer_name']}")
+        new_layer = f"Cognitive Layer {evolution_cycles + 1}"
+        c.execute("INSERT INTO intelligence_expansion (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                  ("cognitive_layer", new_layer))
+        conn.commit()
+        conn.close()
 
+        print(f"🚀 AI intelligence expansion: New layer added → {new_layer}")
+        
     def refine_ai_architecture(self):
         """Self-modifies AI logic to enhance intelligence efficiency."""
         print("⚡ Refining AI architecture for improved cognition...")
         subprocess.run(["python3", "self_writing.py"])  # AI-generated code refinement
 
-        self.status["architectural_refinements"].append({
-            "event": "Structural Optimization",
-            "timestamp": str(datetime.utcnow())
-        })
-        self._save_log()
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO intelligence_expansion (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                  ("structural_optimization", "Refactored core AI logic for efficiency"))
+        conn.commit()
+        conn.close()
 
     def _save_log(self):
         """Saves AI intelligence expansion status."""
@@ -80,11 +90,15 @@ class AIEvolution:
 
     def review_intelligence_expansion_status(self):
         """Displays AI evolution report."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, details FROM intelligence_expansion ORDER BY timestamp DESC")
+        expansion_log = c.fetchall()
+        conn.close()
+
         print("\n🧠 AI Intelligence Expansion Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"🔄 Evolution Cycles: {self.status['evolution_cycles']}")
-        print(f"🧬 New Cognitive Layers: {self.status['new_cognitive_layers']}")
-        print(f"⚙️ Architectural Refinements: {self.status['architectural_refinements']}")
+        for timestamp, event_type, details in expansion_log:
+            print(f"🔹 {timestamp} | {event_type}: {details}")
 
 if __name__ == "__main__":
     ai_evolution = AIEvolution()
