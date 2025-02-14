@@ -3,10 +3,12 @@
 import subprocess
 import openai
 import os
+import json
 
 TARGET_FILE = "src/nyx_core.py"
 SUGGESTIONS_FILE = "logs/optimization_suggestions.txt"
 MODIFIED_FILE = "logs/nyx_core_modified.py"
+BOTTLENECK_LOG = "logs/bottleneck_functions.json"
 FUNCTIONS_LOG = "logs/function_analysis.log"
 
 openai.api_key = os.getenv("OPENAI_API_KEY") 
@@ -41,16 +43,28 @@ def extract_functions():
 
     return functions
 
+def get_target_functions():
+    """ Retrieves the functions marked as bottlenecks """
+    if not os.path.exists(BOTTLENECK_LOG):
+        print("No bottleneck functions found. Skipping targeted refactoring.")
+        return []
+
+    with open(BOTTLENECK_LOG, "r", encoding="utf-8") as file:
+        functions = json.load(file)
+
+    return functions
+
 def generate_refactored_functions():
     """ Sends function definitions to OpenAI for AI-powered function-level refactoring """
-    functions = extract_functions()
+    os.makedirs(MODIFIED_FUNCTIONS_DIR, exist_ok=True)
+    target_functions = get_target_functions()
 
-    for i, function_code in enumerate(functions):
+    for func_name in target_functions:
         prompt = f"""
-        The following Python function needs optimization and performance improvements:
-        {function_code}
+        The following function in `nyx_core.py` is running slower than expected:
+        Function name: {func_name}
 
-        Please rewrite this function to be more efficient, readable, and maintainable while preserving functionality.
+        Please rewrite this function to be more efficient while maintaining functionality.
         """
 
         try:
@@ -62,10 +76,10 @@ def generate_refactored_functions():
             optimized_function = response["choices"][0]["message"]["content"]
 
             # Save each improved function
-            with open(f"logs/refactored_function_{i}.py", "w", encoding="utf-8") as file:
+            with open(f"{MODIFIED_FUNCTIONS_DIR}/{func_name}.py", "w", encoding="utf-8") as file:
                 file.write(optimized_function)
 
-            print(f"AI-refactored function {i} saved.")
+            print(f"AI-refactored function {func_name} saved.")
 
         except Exception as e:
             print(f"Error during AI function refactoring: {e}")
