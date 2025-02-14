@@ -94,6 +94,16 @@ def decide_active_agents():
     """Determines which AI agents should execute based on priority levels."""
     priorities = load_task_priorities()
     threshold = 6  # Minimum priority level required to run this cycle
+
+    # If priorities is a list, convert it into a dict.
+    # Expected list format: [{"agent": "optimizer", "priority": 7}, ...]
+    if isinstance(priorities, list):
+        new_priorities = {}
+        for entry in priorities:
+            if isinstance(entry, dict) and "agent" in entry and "priority" in entry:
+                new_priorities[entry["agent"]] = entry["priority"]
+        priorities = new_priorities
+
     active_agents = {k: v for k, v in priorities.items() if v >= threshold}
 
     if not active_agents:
