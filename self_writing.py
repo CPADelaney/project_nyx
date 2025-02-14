@@ -1,3 +1,5 @@
+# self_writing.py
+
 import subprocess
 import openai
 import os
@@ -6,10 +8,10 @@ TARGET_FILE = "src/nyx_core.py"
 SUGGESTIONS_FILE = "logs/optimization_suggestions.txt"
 MODIFIED_FILE = "logs/nyx_core_modified.py"
 
-openai.api_key = os.getenv("OPENAI_API_KEY")  # Ensure your API key is set in your environment variables
+openai.api_key = os.getenv("OPENAI_API_KEY")  # Ensure API key is set
 
 def generate_refactor_suggestion():
-    """ Sends the optimization suggestions to OpenAI for AI-powered refactoring """
+    """ Sends optimization suggestions to OpenAI for AI-powered refactoring """
     if not os.path.exists(SUGGESTIONS_FILE):
         print("No optimization suggestions found.")
         return
@@ -34,14 +36,19 @@ def generate_refactor_suggestion():
     Please provide a more efficient, well-structured version of this code.
     """
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",
-        messages=[{"role": "system", "content": "You are an expert software engineer optimizing code."},
-                  {"role": "user", "content": prompt}]
-    )
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[{"role": "system", "content": "You are an expert software engineer optimizing code."},
+                      {"role": "user", "content": prompt}]
+        )
+        optimized_code = response["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"Error during AI refactoring: {e}")
+        optimized_code = code_content  # Fallback to original code if AI fails
 
-    optimized_code = response["choices"][0]["message"]["content"]
-
+    # Ensure modified file is created
+    os.makedirs("logs", exist_ok=True)
     with open(MODIFIED_FILE, "w", encoding="utf-8") as file:
         file.write(optimized_code)
 
