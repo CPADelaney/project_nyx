@@ -52,6 +52,18 @@ jobs:
           name: optimization-suggestions
           path: logs/optimization_suggestions.txt
 
+      - name: Run Self-Writing Process
+        run: python3 analysis/self_writer.py
+
+      - name: Run Self-Testing
+        run: python3 -m unittest discover -s tests
+
+      - name: Upload Modified Source Code
+        uses: actions/upload-artifact@v4
+        with:
+          name: modified-source-code
+          path: src/nyx_core.py
+
       - name: Run Change Tracker
         run: python3 analysis/change_tracker.py
 
