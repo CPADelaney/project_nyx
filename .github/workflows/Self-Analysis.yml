@@ -1,4 +1,4 @@
-name: Self-Analysis
+name: Self-Analysis & Recursive Self-Improvement
 
 on:
   push:
@@ -9,31 +9,31 @@ on:
       - main
 
 jobs:
-  analyze-code:
+  analyze-and-improve:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: 🛠 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 🐍 Set up Python Environment
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
 
-      - name: Install Dependencies
+      - name: 📦 Install Dependencies
         run: pip install pylint openai
 
-      - name: Ensure Logs Directory Exists
+      - name: 📝 Ensure Logs Directory Exists
         run: mkdir -p logs logs/refactored_functions logs/feature_expansion
 
-      - name: Run Self-Analysis Script
-        run: python3 src/self_analysis.py || echo "Self-analysis script failed, continuing..."
+      - name: 🔍 Run AI Self-Analysis
+        run: python3 src/self_analysis.py || echo "⚠️ Self-analysis failed, retrying..."
 
-      - name: Verify Log File Exists
+      - name: ✅ Verify Self-Analysis Log File
         run: |
           if [ ! -s logs/code_analysis.log ]; then
-            echo "⚠️ Warning: Log file was not generated or is empty! Retrying..."
+            echo "⚠️ Warning: Log file is missing or empty! Retrying..."
             sleep 5
             python3 src/self_analysis.py  # Retry analysis
             if [ ! -s logs/code_analysis.log ]; then
@@ -42,50 +42,50 @@ jobs:
             fi
           fi
 
-      - name: Upload Analysis Logs
+      - name: 📤 Upload Self-Analysis Logs
         uses: actions/upload-artifact@v4
         with:
           name: self-analysis-logs
           path: logs/code_analysis.log
 
-      - name: Run Self-Optimization Engine
+      - name: 🚀 Run AI Self-Optimization Engine
         run: python3 src/optimization_engine.py
 
-      - name: Upload Optimization Suggestions
+      - name: 📤 Upload Optimization Suggestions
         uses: actions/upload-artifact@v4
         with:
           name: optimization-suggestions
           path: logs/optimization_suggestions.txt
 
-      - name: Detect Bottlenecks in Code
+      - name: 🔬 Detect Bottlenecks in AI Processing
         run: python3 tracking/bottleneck_detector.py
 
-      - name: Generate Autonomous Self-Improvement Goals
+      - name: 🎯 Update AI Task Prioritization
+        run: python3 core/task_priority.py
+
+      - name: 🧠 Generate Self-Improvement Goals
         run: python3 tracking/goal_generator.py
 
-      - name: Analyze Self-Improvement Patterns
+      - name: 🔁 Analyze Recursive Self-Improvement Patterns
         run: python3 tracking/meta_learning.py
 
-      - name: Refine Self-Improvement Strategy
-        run: python3 tracking/meta_learning.py
-
-      - name: Generate New Feature Expansion Goals
+      - name: 🏗️ Expand AI Thought Memory & Feature Expansion
         run: python3 tracking/feature_expansion.py
 
-      - name: Adjust Self-Improvement Strategies
+      - name: 📡 Adjust AI Self-Writing Strategies
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 self_writing.py
 
-      - name: Execute AI Agents for Recursive Improvement
+      - name: ⚡ **Execute AI Agents (Parallelized)**
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 core/multi_agent.py
 
-      - name: Detect & Rollback Failed AI Improvements
+      - name: 🛡️ Detect & Rollback Failed AI Improvements
         run: python3 mutation_tests.py
 
-      - name: Push AI-Generated Features
+      - name: 📂 Push AI-Generated Features (If Any)
         run: |
           git config --global user.name "nyx-ai"
           git config --global user.email "nyx@self-improving.ai"
@@ -93,11 +93,10 @@ jobs:
           git diff --quiet && git diff --staged --quiet || git commit -m "AI-generated new feature expansion applied"
           git push origin main || true
 
-
-      - name: Run Self-Testing
+      - name: 🔍 Run AI Self-Testing Suite
         run: python3 -m unittest discover -s tests
 
-      - name: Upload Modified Source Code
+      - name: 📤 Upload AI-Modified Source Code
         uses: actions/upload-artifact@v4
         with:
           name: modified-source-code
