@@ -17,7 +17,6 @@ class GoalGenerator:
     def __init__(self):
         self.goals = []
         self.evolution_plans = []
-        self._load_existing_evolution_plans()
         initialize_log_db() 
 
 
