@@ -1,13 +1,18 @@
 # src/multi_agent.py
 
-import json
+import sys
 import os
+
+# Ensure `src/` is in the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from src.personality import get_personality
+import json
 import openai
 import subprocess
-from src.personality import get_personality
 
-AGENT_CONFIG = "src/agents.json"
-ANALYSIS_LOG = "logs/code_analysis.json"
+AGENT_CONFIG = "core/agents.json"
+ANALYSIS_LOG = "logs/code_analysis.log"
 
 DEFAULT_AGENTS = {
     "optimizer": {"role": "Improves code performance and efficiency", "active": True},
@@ -34,12 +39,11 @@ def run_self_analysis():
     print("🔎 Running Self-Analysis...")
     subprocess.run(["python3", "src/self_analysis.py"])
 
-    if not os.path.exists("logs/code_analysis.log"):
+    if not os.path.exists(ANALYSIS_LOG):
         print("❌ Self-Analysis Failed: Log not generated!")
         return None
 
-    # Read analysis results
-    with open("logs/code_analysis.log", "r", encoding="utf-8") as file:
+    with open(ANALYSIS_LOG, "r", encoding="utf-8") as file:
         return file.read()
 
 def assign_tasks(analysis_results):
