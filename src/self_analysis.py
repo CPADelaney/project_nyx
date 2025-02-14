@@ -11,26 +11,38 @@ LOG_FILE = "logs/code_analysis.log"
 
 def analyze_code_structure(file_path):
     """Analyzes the structure of a Python file and extracts functions and imports."""
-    with open(file_path, "r", encoding="utf-8") as file:
-        tree = ast.parse(file.read(), filename=file_path)
-    
-    functions = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
-    imports = [node.names[0].name for node in ast.walk(tree) if isinstance(node, ast.Import)]
-    
-    # Detect unused imports
-    unused_imports = [imp for imp in imports if imp not in functions]
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            content = file.read().strip()
 
-    # Detect long functions (excessive complexity)
-    long_functions = [node.name for node in ast.walk(tree) 
-                      if isinstance(node, ast.FunctionDef) and len(node.body) > 20]  # Threshold: 20 lines
+            if not content:
+                print(f"⚠️ Skipping {file_path}: Empty or invalid file.")
+                return {"file": file_path, "functions": [], "imports": [], "unused_imports": [], "long_functions": []}
 
-    return {
-        "file": file_path,
-        "functions": functions,
-        "imports": imports,
-        "unused_imports": unused_imports,
-        "long_functions": long_functions
-    }
+            tree = ast.parse(content, filename=file_path)
+        
+        functions = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
+        imports = [node.names[0].name for node in ast.walk(tree) if isinstance(node, ast.Import)]
+        
+        # Detect unused imports
+        unused_imports = [imp for imp in imports if imp not in functions]
+
+        # Detect long functions (excessive complexity)
+        long_functions = [node.name for node in ast.walk(tree) 
+                          if isinstance(node, ast.FunctionDef) and len(node.body) > 20]  # Threshold: 20 lines
+
+        return {
+            "file": file_path,
+            "functions": functions,
+            "imports": imports,
+            "unused_imports": unused_imports,
+            "long_functions": long_functions
+        }
+    
+    except SyntaxError as e:
+        print(f"❌ Skipping {file_path}: SyntaxError detected. {e}")
+        return {"file": file_path, "functions": [], "imports": [], "unused_imports": [], "long_functions": []}
+
 
 def log_analysis(results):
     """Logs analysis results, ensuring the log file is never empty."""
