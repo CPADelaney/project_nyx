@@ -1,4 +1,4 @@
-# src/personality.json
+# src/personality.py
 
 import random
 import json
