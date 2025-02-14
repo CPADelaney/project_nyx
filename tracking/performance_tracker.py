@@ -3,6 +3,7 @@
 import os
 import json
 import timeit
+import src
 
 LOG_FILE = "logs/performance_history.json"
 TARGET_FILE = "src/nyx_core.py"
