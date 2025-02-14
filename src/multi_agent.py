@@ -11,7 +11,7 @@ import json
 import openai
 import subprocess
 
-AGENT_CONFIG = "core/agents.json"
+AGENT_CONFIG = "src/agents.json"
 ANALYSIS_LOG = "logs/code_analysis.log"
 
 DEFAULT_AGENTS = {
