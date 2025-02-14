@@ -1,3 +1,5 @@
+# self_writing.py
+
 import subprocess
 import openai
 import os
