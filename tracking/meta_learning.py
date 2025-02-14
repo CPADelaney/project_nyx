@@ -1,8 +1,12 @@
 # tracking/meta_learning.py
 
-import json
+import sys
 import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from src.personality import get_personality
+import json
 
 PERFORMANCE_LOG = "logs/performance_history.json"
 META_LEARNING_LOG = "logs/meta_learning.json"
