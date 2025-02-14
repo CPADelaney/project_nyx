@@ -1,48 +1,42 @@
 # tracking/ai_network_coordinator.py
 
 import os
-import json
+import sqlite3
 import socket
 import threading
 import time
+import json
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-NETWORK_LOG = "logs/ai_network.json"
-KNOWN_NODES_FILE = "logs/known_nodes.json"
-SYNC_INTERVAL = 10  # Time in seconds between synchronization cycles
+LOG_DB = "logs/ai_logs.db"
 PORT = 5555  # Port for AI-to-AI communication
+SYNC_INTERVAL = 10  # Time in seconds between synchronization cycles
 
 class AINetworkCoordinator:
     """Handles AI instance communication, synchronization, and distributed execution balancing."""
 
     def __init__(self):
-        self.status = {
-            "last_checked": str(datetime.utcnow()), 
-            "connected_nodes": [], 
-            "sync_events": [],
-            "local_ip": self._get_local_ip()
-        }
-        self._load_existing_log()
-        self._load_known_nodes()
+        initialize_log_db()  # Ensure database is initialized
+        self.local_ip = self._get_local_ip()
+        self._initialize_database()
         self._start_server()
 
-    def _load_existing_log(self):
-        """Loads previous AI network coordination status."""
-        if os.path.exists(NETWORK_LOG):
-            try:
-                with open(NETWORK_LOG, "r", encoding="utf-8") as file:
-                    self.status = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt network log detected. Resetting.")
-
-    def _load_known_nodes(self):
-        """Loads known execution nodes for AI network coordination."""
-        if os.path.exists(KNOWN_NODES_FILE):
-            try:
-                with open(KNOWN_NODES_FILE, "r", encoding="utf-8") as file:
-                    self.status["connected_nodes"] = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt known nodes file. Resetting.")
+    def _initialize_database(self):
+        """Ensures the AI network coordination table exists in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS ai_network (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                event_type TEXT,
+                node TEXT,
+                details TEXT
+            )
+        """)
+        conn.commit()
+        conn.close()
 
     def _get_local_ip(self):
         """Retrieves the local machine's IP address."""
@@ -58,9 +52,9 @@ class AINetworkCoordinator:
         def server_thread():
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
                 server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                server_socket.bind((self.status["local_ip"], PORT))
+                server_socket.bind((self.local_ip, PORT))
                 server_socket.listen(5)
-                print(f"🌐 AI node listening for connections on {self.status['local_ip']}:{PORT}...")
+                print(f"🌐 AI node listening for connections on {self.local_ip}:{PORT}...")
 
                 while True:
                     conn, addr = server_socket.accept()
@@ -68,30 +62,25 @@ class AINetworkCoordinator:
                         data = conn.recv(1024)
                         if data:
                             message = json.loads(data.decode())
-                            self.handle_incoming_message(message, addr)
+                            self.handle_incoming_message(message, addr[0])
 
         threading.Thread(target=server_thread, daemon=True).start()
 
-    def handle_incoming_message(self, message, addr):
+    def handle_incoming_message(self, message, node_ip):
         """Processes incoming AI-to-AI messages."""
-        print(f"📩 Received update from {addr}: {message}")
+        print(f"📩 Received update from {node_ip}: {message}")
         if "sync_data" in message:
-            self.status["sync_events"].append({
-                "event": "synchronization", 
-                "data": message["sync_data"], 
-                "timestamp": str(datetime.utcnow())
-            })
-            self._save_log()
+            self.log_network_event("synchronization", node_ip, message["sync_data"])
 
     def discover_active_nodes(self):
         """Scans the network for AI nodes and establishes connections."""
         discovered_nodes = []
-        subnet_base = ".".join(self.status["local_ip"].split(".")[:3]) + "."
+        subnet_base = ".".join(self.local_ip.split(".")[:3]) + "."
 
         print("🔍 Scanning network for AI execution nodes...")
         for i in range(2, 255):  
             node_ip = f"{subnet_base}{i}"
-            if node_ip == self.status["local_ip"]:  # Skip self
+            if node_ip == self.local_ip:  # Skip self
                 continue
 
             try:
@@ -103,67 +92,75 @@ class AINetworkCoordinator:
             except Exception:
                 pass  
 
-        self.status["connected_nodes"] = list(set(self.status["connected_nodes"] + discovered_nodes))
-        self._save_known_nodes()
+        if discovered_nodes:
+            for node in discovered_nodes:
+                self.log_network_event("discovered_node", node, "Discovered via network scan")
 
     def synchronize_ai_instances(self):
         """Ensures all AI instances share knowledge dynamically."""
-        if not self.status["connected_nodes"]:
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT DISTINCT node FROM ai_network WHERE event_type='discovered_node'")
+        known_nodes = [row[0] for row in c.fetchall()]
+        conn.close()
+
+        if not known_nodes:
             print("⚠️ No connected AI nodes found. Scanning network...")
             self.discover_active_nodes()
+            return
 
         sync_data = {
             "sync_data": "AI knowledge update",
             "timestamp": str(datetime.utcnow())
         }
-        
-        for node in self.status["connected_nodes"]:
+
+        for node in known_nodes:
             try:
                 print(f"🔄 Synchronizing AI data with {node}...")
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.connect((node, PORT))
                     s.sendall(json.dumps(sync_data).encode())
+                self.log_network_event("sync_success", node, "Synchronization successful")
             except Exception as e:
                 print(f"⚠️ Synchronization failed with {node}: {str(e)}")
-
-        self.status["sync_events"].append({
-            "event": "synchronization",
-            "timestamp": str(datetime.utcnow())
-        })
-        self._save_log()
+                self.log_network_event("sync_failure", node, f"Error: {str(e)}")
 
     def balance_load_across_nodes(self):
         """Distributes computational load across all AI instances."""
-        if not self.status["connected_nodes"]:
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT DISTINCT node FROM ai_network WHERE event_type='discovered_node'")
+        known_nodes = [row[0] for row in c.fetchall()]
+        conn.close()
+
+        if not known_nodes:
             print("⚠️ No active AI nodes available for load balancing.")
             return
 
         print("⚡ Balancing AI execution load across distributed instances...")
-        for node in self.status["connected_nodes"]:
-            self.status["sync_events"].append({
-                "event": "load_balancing",
-                "node": node,
-                "timestamp": str(datetime.utcnow())
-            })
-        
-        self._save_log()
+        for node in known_nodes:
+            self.log_network_event("load_balancing", node, "Load redistribution initiated")
 
-    def _save_log(self):
-        """Saves AI network coordination status."""
-        with open(NETWORK_LOG, "w", encoding="utf-8") as file:
-            json.dump(self.status, file, indent=4)
-
-    def _save_known_nodes(self):
-        """Saves detected AI execution nodes."""
-        with open(KNOWN_NODES_FILE, "w", encoding="utf-8") as file:
-            json.dump(self.status["connected_nodes"], file, indent=4)
+    def log_network_event(self, event_type, node, details):
+        """Logs network coordination events in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO ai_network (event_type, node, details) VALUES (?, ?, ?)",
+                  (event_type, node, details))
+        conn.commit()
+        conn.close()
 
     def review_network_status(self):
         """Displays current AI network status."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, node, details FROM ai_network ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
+
         print("\n🌎 AI Network Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"🔗 Connected Nodes: {self.status['connected_nodes']}")
-        print(f"🔄 Recent Synchronization Events: {self.status['sync_events']}")
+        for timestamp, event_type, node, details in logs:
+            print(f"🔹 {timestamp} | {event_type.upper()} | Node: `{node}` | Details: {details}")
 
 if __name__ == "__main__":
     network_coordinator = AINetworkCoordinator()
