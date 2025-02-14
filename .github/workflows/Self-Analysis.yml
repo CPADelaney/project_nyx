@@ -22,7 +22,7 @@ jobs:
           python-version: "3.9"
 
       - name: 📦 Install Dependencies
-        run: pip install pylint openai
+        run: pip install pylint openai psutil
 
       - name: 📝 Ensure Logs & Required Directories Exist
         run: mkdir -p logs logs/refactored_functions logs/feature_expansion logs/rollback_snapshots src/generated_features
@@ -99,6 +99,9 @@ jobs:
 
       - name: ♾️ **Ensure AI Long-Term Sustainability**
         run: python3 tracking/self_sustainability.py
+
+      - name: 🚀 **Enable AI Autonomous Expansion**
+        run: python3 tracking/ai_autonomous_expansion.py
 
       - name: ⚡ **Execute AI Agents (Parallelized)**
         env:
