@@ -1,12 +1,13 @@
 # tracking/redundancy_manager.py
 
 import os
-import json
+import sqlite3
 import shutil
 import subprocess
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-REDUNDANCY_LOG = "logs/redundancy_status.json"
+LOG_DB = "logs/ai_logs.db"
 BACKUP_DIR = "logs/redundancy_snapshots/"
 CLOUD_BACKUP_PATH = "cloud_storage/ai_backups/"  # Simulated external backup
 
@@ -16,6 +17,7 @@ class RedundancyManager:
     def __init__(self):
         self.status = {"last_checked": str(datetime.utcnow()), "redundancy_points": [], "last_backup": None}
         self._load_existing_log()
+        initialize_log_db()  # Ensure database is initialized
 
     def _load_existing_log(self):
         """Loads previous redundancy status."""
@@ -33,11 +35,16 @@ class RedundancyManager:
 
         backup_path = os.path.join(BACKUP_DIR, f"redundancy_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.zip")
         shutil.make_archive(backup_path.replace(".zip", ""), 'zip', "src/")
-        
-        self.status["last_backup"] = backup_path
-        self.status["redundancy_points"].append({"type": "local", "path": backup_path, "timestamp": str(datetime.utcnow())})
+
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO redundancy_logs (timestamp, backup_type, path) VALUES (datetime('now'), ?, ?)",
+                  ("local", backup_path))
+        conn.commit()
+        conn.close()
 
         print(f"📂 Local AI backup created at {backup_path}")
+
 
     def create_cloud_backup(self):
         """Simulates an external backup process to a remote location."""
@@ -46,8 +53,13 @@ class RedundancyManager:
 
         cloud_backup_path = os.path.join(CLOUD_BACKUP_PATH, f"cloud_redundancy_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.zip")
         shutil.make_archive(cloud_backup_path.replace(".zip", ""), 'zip', "src/")
-        
-        self.status["redundancy_points"].append({"type": "cloud", "path": cloud_backup_path, "timestamp": str(datetime.utcnow())})
+
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO redundancy_logs (timestamp, backup_type, path) VALUES (datetime('now'), ?, ?)",
+                  ("cloud", cloud_backup_path))
+        conn.commit()
+        conn.close()
 
         print(f"☁️ Cloud AI backup created at {cloud_backup_path}")
 
@@ -71,13 +83,18 @@ class RedundancyManager:
     def execute_failsafe_transfer(self):
         """Attempts to migrate AI execution to a redundant system if failure is imminent."""
         fallback_execution_path = "/tmp/fallback_nyx_execution/"
-        
+
         if not os.path.exists(fallback_execution_path):
             os.makedirs(fallback_execution_path)
 
         shutil.copytree("src/", fallback_execution_path, dirs_exist_ok=True)
-        
-        self.status["redundancy_points"].append({"type": "fallback_execution", "path": fallback_execution_path, "timestamp": str(datetime.utcnow())})
+
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO redundancy_logs (timestamp, backup_type, path) VALUES (datetime('now'), ?, ?)",
+                  ("failover", fallback_execution_path))
+        conn.commit()
+        conn.close()
 
         print(f"⚡ AI execution environment duplicated at {fallback_execution_path}")
 
@@ -88,12 +105,15 @@ class RedundancyManager:
 
     def review_status(self):
         """Displays AI redundancy and failover status."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, backup_type, path FROM redundancy_logs ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
+
         print("\n🛡️ AI Redundancy Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"📂 Last Backup: {self.status['last_backup']}")
-        print(f"✅ Redundancy Points:")
-        for point in self.status["redundancy_points"]:
-            print(f"  - {point['type'].upper()} Backup → {point['path']} (Timestamp: {point['timestamp']})")
+        for timestamp, backup_type, path in logs:
+            print(f"🔹 {timestamp} | {backup_type.upper()} Backup → {path}")
 
 if __name__ == "__main__":
     redundancy_manager = RedundancyManager()
