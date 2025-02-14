@@ -1,18 +1,17 @@
 # src/multi_agent.py
 
 import sys
-from src.task_priority import load_task_priorities  # Ensure this is correctly imported
 import os
+import json
+import openai
+import subprocess
+from src.personality import get_personality
+from src.task_priority import load_task_priorities  # ✅ Fix: Import task prioritization
 
 # Ensure `src/` is in the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.personality import get_personality
-import json
-import openai
-import subprocess
-
-AGENT_CONFIG = "core/agents.json"
+AGENT_CONFIG = "core/agents.json"  # ✅ Fix: Corrected path
 ANALYSIS_LOG = "logs/code_analysis.log"
 
 DEFAULT_AGENTS = {
@@ -74,10 +73,9 @@ def decide_active_agents():
 
     if not active_agents:
         print("⚠️ No high-priority agents needed this cycle. Skipping execution.")
-        return None  # ✅ Now it explicitly exits instead of running empty tasks
+        return None  # ✅ Now correctly exits if no agents are needed
 
     return active_agents
-
 
 def get_openai_client():
     """Returns an OpenAI client instance."""
@@ -125,11 +123,14 @@ def execute_agents():
         print("❌ Skipping AI Agent Execution: No self-analysis data available.")
         return
 
-    tasks = assign_tasks(analysis_results)
+    active_agents = decide_active_agents()
+    if not active_agents:
+        return
 
-    for task in tasks:
+    for agent, priority in active_agents.items():
+        task = f"Executing {agent} tasks at priority {priority}."
         result = generate_ai_response(task)
-        print(f"⚡ Task Completed: {task}\n{result}\n{'='*50}")
+        print(f"⚡ Task Completed: {agent.upper()} - {task}\n{result}\n{'='*50}")
 
 if __name__ == "__main__":
     execute_agents()
