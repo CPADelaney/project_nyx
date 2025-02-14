@@ -3,6 +3,8 @@
 import sys
 import os
 import json
+import time
+import threading
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -16,60 +18,103 @@ DEFAULT_PRIORITIES = {
     "validator": 5
 }
 
-def load_task_priorities():
-    """Loads or initializes AI agent task priorities."""
-    if os.path.exists(TASK_PRIORITY_LOG):
+class TaskPriorityManager:
+    """Manages AI agent task priorities with real-time attention scaling."""
+
+    def __init__(self):
+        self.task_priorities = self.load_task_priorities()
+        self.lock = threading.Lock()  # Ensure safe concurrent updates
+
+    def load_task_priorities(self):
+        """Loads or initializes AI agent task priorities."""
+        if os.path.exists(TASK_PRIORITY_LOG):
+            try:
+                with open(TASK_PRIORITY_LOG, "r", encoding="utf-8") as file:
+                    return json.load(file)
+            except json.JSONDecodeError:
+                print("⚠️ Corrupt task priority config. Resetting.")
+
+        with open(TASK_PRIORITY_LOG, "w", encoding="utf-8") as file:
+            json.dump(DEFAULT_PRIORITIES, file, indent=4)
+        return DEFAULT_PRIORITIES
+
+    def ensure_performance_log(self):
+        """Ensures the performance history file is always properly initialized."""
+        if not os.path.exists(PERFORMANCE_LOG) or os.stat(PERFORMANCE_LOG).st_size == 0:
+            with open(PERFORMANCE_LOG, "w", encoding="utf-8") as file:
+                json.dump([], file, indent=4)  # ✅ Ensure a valid JSON list structure
+            print("✅ Initialized performance history log.")
+
+    def adjust_task_priorities(self):
+        """Dynamically adjusts AI agent execution priorities based on recent performance history."""
+        self.ensure_performance_log()
+
         try:
-            with open(TASK_PRIORITY_LOG, "r", encoding="utf-8") as file:
-                return json.load(file)
+            with open(PERFORMANCE_LOG, "r", encoding="utf-8") as file:
+                history = json.load(file)
+                if not history:
+                    print("⚠️ Performance history is empty. Keeping current priorities.")
+                    return self.task_priorities
         except json.JSONDecodeError:
-            print("⚠️ Corrupt task priority config. Resetting.")
+            print("❌ Error: Performance history file is corrupt. Resetting to defaults.")
+            self.ensure_performance_log()
+            return self.task_priorities
 
-    with open(TASK_PRIORITY_LOG, "w", encoding="utf-8") as file:
-        json.dump(DEFAULT_PRIORITIES, file, indent=4)
-    return DEFAULT_PRIORITIES
+        # Adjust priorities based on last 3 performance cycles
+        for entry in history[-3:]:
+            if "slowest_functions" in entry:
+                self.task_priorities["optimizer"] += 1
+            if "security_alerts" in entry:
+                self.task_priorities["security"] += 2
+            if "new_feature_requests" in entry:
+                self.task_priorities["expander"] += 1
 
-def ensure_performance_log():
-    """Ensures the performance history file is always properly initialized."""
-    if not os.path.exists(PERFORMANCE_LOG) or os.stat(PERFORMANCE_LOG).st_size == 0:
-        with open(PERFORMANCE_LOG, "w", encoding="utf-8") as file:
-            json.dump([], file, indent=4)  # ✅ Ensure a valid JSON list structure
-        print("✅ Initialized performance history log.")
+        # Normalize priority values (keep between 1-10)
+        for agent in self.task_priorities:
+            self.task_priorities[agent] = max(1, min(10, self.task_priorities[agent]))
 
-def adjust_task_priorities():
-    """Adjusts agent execution priorities based on performance trends."""
-    ensure_performance_log()  # ✅ Make sure file is always valid before loading
-    
-    try:
-        with open(PERFORMANCE_LOG, "r", encoding="utf-8") as file:
-            history = json.load(file)
-            if not history:  # ✅ Fix: Check if JSON is empty
-                print("⚠️ Performance history is empty. Keeping current priorities.")
-                return load_task_priorities()
-    except json.JSONDecodeError:
-        print("❌ Error: Performance history file is corrupt. Resetting to defaults.")
-        ensure_performance_log()  # ✅ Reset if corrupt
-        return load_task_priorities()
+        self.save_task_priorities()
 
-    task_priorities = load_task_priorities()
+        print(f"✅ Updated AI task priorities: {self.task_priorities}")
 
-    # Analyze slowdowns & adjust priorities dynamically
-    for entry in history[-3:]:  # Look at last 3 performance cycles
-        if "slowest_functions" in entry:
-            task_priorities["optimizer"] += 1  # Increase optimization priority if slowdowns detected
-        if "security_alerts" in entry:
-            task_priorities["security"] += 2  # Increase security checks if vulnerabilities detected
-        if "new_feature_requests" in entry:
-            task_priorities["expander"] += 1  # Increase feature expansion priority
+    def save_task_priorities(self):
+        """Saves task priorities to the log file."""
+        with open(TASK_PRIORITY_LOG, "w", encoding="utf-8") as file:
+            json.dump(self.task_priorities, file, indent=4)
 
-    # Normalize priorities (keep values between 1-10)
-    for agent in task_priorities:
-        task_priorities[agent] = max(1, min(10, task_priorities[agent]))
+    def real_time_priority_adjustment(self, task, impact_score):
+        """Dynamically adjusts priority in real-time based on task execution impact."""
+        with self.lock:
+            if task in self.task_priorities:
+                adjustment = impact_score // 2  # Scale impact influence
+                self.task_priorities[task] = max(1, min(10, self.task_priorities[task] + adjustment))
+                self.save_task_priorities()
+                print(f"⚡ Real-Time Priority Update: {task} → {self.task_priorities[task]}")
 
-    with open(TASK_PRIORITY_LOG, "w", encoding="utf-8") as file:
-        json.dump(task_priorities, file, indent=4)
+    def redistribute_resources(self):
+        """Reallocates AI processing power dynamically based on active task loads."""
+        with self.lock:
+            highest_priority = max(self.task_priorities, key=self.task_priorities.get)
+            lowest_priority = min(self.task_priorities, key=self.task_priorities.get)
 
-    print(f"✅ Updated AI task priorities: {task_priorities}")
+            # Shift resources from lowest priority to highest priority
+            if self.task_priorities[highest_priority] > self.task_priorities[lowest_priority] + 2:
+                print(f"🔄 Redistributing resources: Boosting {highest_priority}, reducing {lowest_priority}")
+                self.task_priorities[highest_priority] = min(10, self.task_priorities[highest_priority] + 1)
+                self.task_priorities[lowest_priority] = max(1, self.task_priorities[lowest_priority] - 1)
+
+            self.save_task_priorities()
+
+    def continuous_monitoring(self):
+        """Runs a background thread that continuously optimizes AI task allocation in real-time."""
+        def monitor():
+            while True:
+                time.sleep(10)  # Adjust interval for real-time responsiveness
+                self.redistribute_resources()
+
+        threading.Thread(target=monitor, daemon=True).start()
 
 if __name__ == "__main__":
-    adjust_task_priorities()
+    priority_manager = TaskPriorityManager()
+    priority_manager.adjust_task_priorities()
+    priority_manager.continuous_monitoring()
