@@ -1,5 +1,3 @@
-# self_analysis.py
-
 import ast
 import os
 
@@ -16,10 +14,19 @@ def analyze_code_structure(file_path):
     functions = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
     imports = [node.names[0].name for node in ast.walk(tree) if isinstance(node, ast.Import)]
     
+    # Detect unused imports
+    unused_imports = [imp for imp in imports if imp not in functions]
+
+    # Detect long functions (excessive complexity)
+    long_functions = [node.name for node in ast.walk(tree) 
+                      if isinstance(node, ast.FunctionDef) and len(node.body) > 20]  # Threshold: 20 lines
+
     return {
         "file": file_path,
         "functions": functions,
-        "imports": imports
+        "imports": imports,
+        "unused_imports": unused_imports,
+        "long_functions": long_functions
     }
 
 def log_analysis(results):
@@ -28,6 +35,8 @@ def log_analysis(results):
             log_file.write(f"File: {result['file']}\n")
             log_file.write(f"Functions: {', '.join(result['functions'])}\n")
             log_file.write(f"Imports: {', '.join(result['imports'])}\n")
+            log_file.write(f"Unused Imports: {', '.join(result['unused_imports'])}\n")
+            log_file.write(f"Complex Functions: {', '.join(result['long_functions'])}\n")
             log_file.write("="*40 + "\n")
 
 def main():
