@@ -1,5 +1,5 @@
 # tracking/goal_generator.py
-
+import sys
 import os
 import sqlite3
 from collections import Counter
