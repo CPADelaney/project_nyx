@@ -55,27 +55,19 @@ jobs:
           name: optimization-suggestions
           path: logs/optimization_suggestions.txt
 
-      - name: Run AI Function-Level Refactoring
+      - name: Detect Bottlenecks in Code
+        run: python3 tracking/bottleneck_detector.py
+
+      - name: Run AI Targeted Refactoring
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 self_writing.py
 
-      - name: Compare AI-Suggested Changes
-        run: python3 mutation_tests.py
-
-      - name: Upload AI-Modified Code (if applicable)
+      - name: Upload AI-Refactored Functions
         uses: actions/upload-artifact@v4
         with:
-          name: ai-optimized-source-code
-          path: src/nyx_core.py
-
-      - name: Push AI-Approved Functions
-        run: |
-          git config --global user.name "nyx-ai"
-          git config --global user.email "nyx@self-improving.ai"
-          git add src/nyx_core.py logs/refactored_function_*.py || true
-          git diff --quiet && git diff --staged --quiet || git commit -m "AI function refactoring applied"
-          git push origin main || true
+          name: ai-refactored-functions
+          path: logs/refactored_functions/*.py
 
       - name: Run AI Function Performance Tests
         run: python3 mutation_tests.py
@@ -86,11 +78,13 @@ jobs:
       - name: Decide Whether to Keep AI Changes
         run: python3 mutation_tests.py
 
-      - name: Upload AI-Refactored Functions
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-refactored-functions
-          path: logs/refactored_function_*.py
+      - name: Push AI-Approved Functions
+        run: |
+          git config --global user.name "nyx-ai"
+          git config --global user.email "nyx@self-improving.ai"
+          git add src/nyx_core.py logs/refactored_functions/*.py || true
+          git diff --quiet && git diff --staged --quiet || git commit -m "AI function refactoring applied"
+          git push origin main || true
 
       - name: Run Self-Testing
         run: python3 -m unittest discover -s tests
