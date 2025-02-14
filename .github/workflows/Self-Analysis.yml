@@ -80,6 +80,12 @@ jobs:
       - name: Run AI Function Performance Tests
         run: python3 mutation_tests.py
 
+      - name: Track Performance Over Time
+        run: python3 tracking/performance_tracker.py
+
+      - name: Decide Whether to Keep AI Changes
+        run: python3 mutation_tests.py
+
       - name: Upload AI-Refactored Functions
         uses: actions/upload-artifact@v4
         with:
