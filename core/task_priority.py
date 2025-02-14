@@ -27,12 +27,17 @@ def load_task_priorities():
         json.dump(DEFAULT_PRIORITIES, file, indent=4)
     return DEFAULT_PRIORITIES
 
+def ensure_performance_log():
+    """Ensures the performance history file is always properly initialized."""
+    if not os.path.exists(PERFORMANCE_LOG) or os.stat(PERFORMANCE_LOG).st_size == 0:
+        with open(PERFORMANCE_LOG, "w", encoding="utf-8") as file:
+            json.dump([], file, indent=4)  # ✅ Ensure a valid JSON list structure
+        print("✅ Initialized performance history log.")
+
 def adjust_task_priorities():
     """Adjusts agent execution priorities based on performance trends."""
-    if not os.path.exists(PERFORMANCE_LOG):
-        print("⚠️ No performance history found. Keeping current priorities.")
-        return load_task_priorities()
-
+    ensure_performance_log()  # ✅ Make sure file is always valid before loading
+    
     try:
         with open(PERFORMANCE_LOG, "r", encoding="utf-8") as file:
             history = json.load(file)
@@ -41,8 +46,7 @@ def adjust_task_priorities():
                 return load_task_priorities()
     except json.JSONDecodeError:
         print("❌ Error: Performance history file is corrupt. Resetting to defaults.")
-        with open(PERFORMANCE_LOG, "w", encoding="utf-8") as file:
-            json.dump([], file, indent=4)  # ✅ Ensure a valid empty JSON list
+        ensure_performance_log()  # ✅ Reset if corrupt
         return load_task_priorities()
 
     task_priorities = load_task_priorities()
