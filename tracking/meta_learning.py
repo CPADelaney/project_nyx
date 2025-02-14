@@ -25,7 +25,7 @@ class MetaLearning:
     """Enhances AI self-improvement by tracking past optimizations and refining strategies dynamically."""
 
     def __init__(self):
-        self.strategy_scores = defaultdict(lambda: 0)  # Reinforcement scores for each strategy
+        self.strategy_scores = defaultdict(lambda: {"success": 0, "failures": 0, "impact": 0})  # Multi-variable tracking
         self._load_meta_learning()
 
     def _load_meta_learning(self):
@@ -43,7 +43,7 @@ class MetaLearning:
             json.dump(self.strategy_scores, file, indent=4)
 
     def analyze_self_improvement_patterns(self):
-        """Scans past optimization cycles and assigns success scores to strategies."""
+        """Scans past optimization cycles and assigns weighted success scores to strategies."""
         if not os.path.exists(PERFORMANCE_LOG):
             print("⚠️ No performance history found. Skipping meta-learning.")
             return
@@ -55,35 +55,49 @@ class MetaLearning:
             if "optimization_strategy" in entry:
                 strategy = entry["optimization_strategy"]
                 if "successful" in entry:
-                    self.strategy_scores[strategy] += 3  # Reward for successful optimizations
+                    self.strategy_scores[strategy]["success"] += 3  # Reward successful optimizations
                 if "failed" in entry:
-                    self.strategy_scores[strategy] -= 2  # Penalize for failures
+                    self.strategy_scores[strategy]["failures"] += 2  # Penalize failed optimizations
                 if "high-impact" in entry:
-                    self.strategy_scores[strategy] += 5  # Extra reward for game-changing optimizations
+                    self.strategy_scores[strategy]["impact"] += 5  # Extra reward for high-impact changes
 
         self._save_meta_learning()
         print(f"📈 Updated reinforcement learning scores: {self.strategy_scores}")
 
+    def weighted_decision_matrix(self):
+        """Evaluates multiple strategies simultaneously using weighted scoring."""
+        scored_strategies = {}
+
+        for strategy, data in self.strategy_scores.items():
+            success_score = data["success"] * 1.5  # Prioritize successful strategies
+            failure_penalty = data["failures"] * -2  # Penalize failed attempts
+            impact_bonus = data["impact"] * 2  # Prioritize high-impact changes
+
+            total_score = success_score + failure_penalty + impact_bonus
+            scored_strategies[strategy] = total_score
+
+        return sorted(scored_strategies.items(), key=lambda x: x[1], reverse=True)
+
     def refine_self_improvement(self):
-        """Chooses the best self-improvement strategy based on past success rates."""
+        """Chooses the best self-improvement strategy based on multi-variable weighted decision-making."""
         personality = get_personality()
 
         if not self.strategy_scores:
             print("⚠️ No strategy history. Choosing a random strategy.")
             selected_strategy = random.choice(EXPERIMENTAL_STRATEGIES)
         else:
-            sorted_strategies = sorted(self.strategy_scores.items(), key=lambda x: x[1], reverse=True)
+            scored_strategies = self.weighted_decision_matrix()
 
-            # Determine best strategy
-            best_strategy = sorted_strategies[0][0] if sorted_strategies else random.choice(EXPERIMENTAL_STRATEGIES)
+            # Select top-ranked strategy
+            best_strategy = scored_strategies[0][0] if scored_strategies else random.choice(EXPERIMENTAL_STRATEGIES)
 
-            # If a second-best strategy is close in score, create a hybrid approach
-            if len(sorted_strategies) > 1 and sorted_strategies[1][1] >= sorted_strategies[0][1] - 2:
-                selected_strategy = f"{best_strategy} + {sorted_strategies[1][0]}"
+            # If another strategy is close in score, merge them for a hybrid approach
+            if len(scored_strategies) > 1 and abs(scored_strategies[0][1] - scored_strategies[1][1]) < 2:
+                selected_strategy = f"{best_strategy} + {scored_strategies[1][0]}"
                 print(f"🔬 Hybrid Strategy Selected: {selected_strategy}")
             else:
                 selected_strategy = best_strategy
-                print(f"✅ Best Past Strategy: {selected_strategy}")
+                print(f"✅ Best Strategy Selected: {selected_strategy}")
 
         # Log selected strategy for next AI cycle
         with open(META_LEARNING_LOG, "w", encoding="utf-8") as file:
