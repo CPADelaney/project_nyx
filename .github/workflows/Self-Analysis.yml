@@ -58,10 +58,10 @@ jobs:
       - name: Run AI-Powered Refactoring
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python3 root/self_writing.py
+        run: python3 self_writing.py
 
       - name: Compare AI-Suggested Changes
-        run: python3 root/mutation_tests.py
+        run: python3 mutation_tests.py
 
       - name: Upload AI-Modified Code (if applicable)
         uses: actions/upload-artifact@v4
