@@ -4,3 +4,4 @@ unittest
 black
 isort
 autopep8
+openai
