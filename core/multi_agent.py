@@ -5,6 +5,7 @@ import os
 import json
 import openai
 import subprocess
+import asyncio
 import concurrent.futures
 import random
 import time
@@ -27,40 +28,61 @@ DEFAULT_AGENTS = {
     "validator": {"role": "Tests and verifies AI-generated improvements", "active": True}
 }
 
-### 🔹 **Load Agents Configuration**
+
+# Load Agents
 def load_agents():
     """Loads AI agents from config or sets defaults."""
     if os.path.exists(AGENT_CONFIG):
-        try:
-            with open(AGENT_CONFIG, "r", encoding="utf-8") as file:
-                return json.load(file)
-        except json.JSONDecodeError:
-            print("⚠️ Corrupt agent config. Resetting.")
+        with open(AGENT_CONFIG, "r", encoding="utf-8") as file:
+            return json.load(file)
+    return {
+        "optimizer": {"role": "Improve efficiency", "priority": 5, "active": True},
+        "expander": {"role": "Develop new features", "priority": 5, "active": True},
+        "security": {"role": "Detect threats", "priority": 5, "active": True},
+        "validator": {"role": "Test optimizations", "priority": 5, "active": True},
+    }
 
-    with open(AGENT_CONFIG, "w", encoding="utf-8") as file:
-        json.dump(DEFAULT_AGENTS, file, indent=4)
-    return DEFAULT_AGENTS
+task_queue = asyncio.PriorityQueue()
 
 ### 🔹 **Parallel Thought Execution with Dynamic Prioritization**
-def _process_thought(thought_id, thought, priority):
-    """Executes parallel AI agent thought processing, scaling priority dynamically."""
-    processing_time = random.uniform(0.5, 2.5) / (priority / 5)  # Scale execution speed by priority
-    print(f"🔹 Thought Agent {thought_id}: Processing '{thought}' at priority {priority} for {processing_time:.2f}s...")
-    time.sleep(processing_time)
-    return {"agent_id": thought_id, "result": f"✅ Completed: {thought}"}
+async def process_thought(agent_name, task, priority):
+    """Processes a given AI task asynchronously with real-time priority."""
+    execution_time = random.uniform(0.5, 2.5) / (priority / 5)  # Scale speed by priority
+    print(f"⚡ [{agent_name}] Running task: '{task}' at priority {priority} ({execution_time:.2f}s)...")
+    
+    await asyncio.sleep(execution_time)  # Simulate async execution
+    return f"✅ [{agent_name}] Task '{task}' completed."
 
-def execute_parallel_thoughts(thoughts, priorities):
-    """Executes AI thought processing in parallel with real-time priority balancing."""
-    results = []
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = {
-            executor.submit(_process_thought, i, thought, priorities[i]): i
-            for i, thought in enumerate(thoughts)
-        }
-        for future in concurrent.futures.as_completed(futures):
-            results.append(future.result())
+async def agent_task_runner():
+    """Continuously fetches and executes tasks from the priority queue."""
+    while True:
+        priority, agent_name, task = await task_queue.get()
+        result = await process_thought(agent_name, task, priority)
+        print(result)
+        task_queue.task_done()
 
-    return results
+async def execute_parallel_thoughts():
+    """Loads tasks dynamically based on agent priority and runs them in parallel."""
+    agents = load_agents()
+    
+    # Populate Task Queue
+    for agent_name, agent in agents.items():
+        if agent["active"]:
+            priority = agent.get("priority", 5)
+            task = f"{agent_name.upper()} Task"
+            await task_queue.put((10 - priority, agent_name, task))  # Lower number = higher priority
+
+    # Spawn async workers
+    workers = [asyncio.create_task(agent_task_runner()) for _ in range(4)]  # Adjust worker count as needed
+    await task_queue.join()  # Wait until all tasks are done
+
+    # Cancel workers after execution
+    for worker in workers:
+        worker.cancel()
+
+# **Main Async Execution**
+if __name__ == "__main__":
+    asyncio.run(execute_parallel_thoughts())
 
 ### 🔹 **Self-Analysis Execution**
 def run_self_analysis():
