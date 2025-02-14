@@ -3,6 +3,7 @@
 import os
 import json
 import ast
+from collections import Counter
 
 LOG_FILE = "logs/performance_history.json"
 TARGET_FILE = "src/nyx_core.py"
