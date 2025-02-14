@@ -82,6 +82,15 @@ jobs:
           echo "🔍 Running AI self-diagnostics..."
           python3 tests/self_test.py || echo "⚠️ Self-diagnostics detected issues, continuing..."
 
+      - name: 🛡️ Ensure AI Self-Preservation
+        run: python3 tracking/self_preservation.py
+
+      - name: 📂 Enforce AI Redundancy
+        run: python3 tracking/redundancy_manager.py
+
+      - name: 🔄 Maintain AI Execution Stability
+        run: python3 tracking/self_execution.py
+
       - name: ⚡ **Execute AI Agents (Parallelized)**
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
