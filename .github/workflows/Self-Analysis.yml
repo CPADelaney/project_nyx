@@ -31,7 +31,7 @@ jobs:
         run: mkdir -p logs && touch logs/code_analysis.log
 
       - name: Run Self-Analysis Script
-        run: python3 analysis/self_analysis.py
+        run: python3 src/self_analysis.py
 
       - name: Verify Log File
         run: |
