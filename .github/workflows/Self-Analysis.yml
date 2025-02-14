@@ -43,6 +43,15 @@ jobs:
           name: self-analysis-logs
           path: logs/code_analysis.log
 
+      - name: Run Self-Optimization Engine
+        run: python3 analysis/self_optimizer.py
+
+      - name: Upload Optimization Suggestions
+        uses: actions/upload-artifact@v4
+        with:
+          name: optimization-suggestions
+          path: logs/optimization_suggestions.txt
+
       - name: Run Change Tracker
         run: python3 analysis/change_tracker.py
 
