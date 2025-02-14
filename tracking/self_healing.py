@@ -1,5 +1,5 @@
 # tracking/self_healing.py
-
+import sys
 import os
 import sqlite3
 import subprocess
