@@ -27,8 +27,21 @@ jobs:
       - name: Run Self-Analysis Script
         run: python3 src/self_analysis.py
 
+      - name: Ensure Log Directory Exists
+        run: mkdir -p logs && touch logs/code_analysis.log
+
+      - name: Run Self-Analysis Script
+        run: python3 analysis/self_analysis.py
+
+      - name: Verify Log File
+        run: |
+          if [ ! -f logs/code_analysis.log ]; then
+            echo "Error: Log file not generated!"
+            exit 1
+          fi
+
       - name: Upload Analysis Logs
         uses: actions/upload-artifact@v4
         with:
           name: self-analysis-logs
-      
+          path: logs/code_analysis.log
