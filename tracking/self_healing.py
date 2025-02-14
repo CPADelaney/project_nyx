@@ -1,13 +1,12 @@
 # tracking/self_healing.py
 
 import os
-import json
+import sqlite3
 import subprocess
-import threading
-import time
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-SELF_HEALING_LOG = "logs/self_healing.json"
+LOG_DB = "logs/ai_logs.db"
 HEALTH_CHECK_INTERVAL = 10  # Time in seconds between system checks
 
 class AISelfHealing:
@@ -20,6 +19,7 @@ class AISelfHealing:
             "healing_events": []
         }
         self._load_existing_log()
+        initialize_log_db()  # Ensure database is initialized
 
     def _load_existing_log(self):
         """Loads previous AI self-healing events."""
@@ -39,48 +39,76 @@ class AISelfHealing:
             cpu_usage = subprocess.check_output(["grep", "cpu", "/proc/stat"]).decode("utf-8")
             if "cpu" in cpu_usage:
                 load_factor = cpu_usage.count(" ") / 100  # Simulated CPU-based load factor
-                
+
                 if load_factor > 0.90:
                     failed_nodes.append("High CPU load detected.")
 
         except Exception as e:
             print(f"⚠️ System health monitoring failed: {str(e)}")
 
-        self.status["failed_nodes"] = failed_nodes
-        self._save_log()
-
         if failed_nodes:
+            self.log_failure(failed_nodes)
             print(f"⚠️ System failures detected: {failed_nodes}")
             self.initiate_repair()
 
+    def log_failure(self, failures):
+        """Logs detected system failures in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        for failure in failures:
+            c.execute("INSERT INTO self_healing_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                      ("system_failure", failure))
+        conn.commit()
+        conn.close()
+
     def initiate_repair(self):
         """Attempts to repair failing nodes and optimize execution infrastructure."""
-        if not self.status["failed_nodes"]:
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+
+        # Fetch last detected failures
+        c.execute("SELECT details FROM self_healing_logs WHERE event_type='system_failure' ORDER BY timestamp DESC LIMIT 1")
+        failed_nodes = c.fetchall()
+        conn.close()
+
+        if not failed_nodes:
             print("✅ No system failures detected. No repair needed.")
             return
 
         healing_events = []
-        for failure in self.status["failed_nodes"]:
-            if "High CPU load" in failure:
+        for failure in failed_nodes:
+            failure_description = failure[0]
+            if "High CPU load" in failure_description:
                 print("⚡ Redistributing AI execution to balance system load.")
                 healing_events.append("Load redistribution triggered.")
 
-        self.status["healing_events"].extend(healing_events)
-        self.status["failed_nodes"] = []  # Reset failures after repair attempt
-        self._save_log()
+        # Log healing events in SQLite
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        for event in healing_events:
+            c.execute("INSERT INTO self_healing_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                      ("healing_action", event))
+        conn.commit()
+        conn.close()
+
         print(f"✅ AI self-healing completed. Repairs applied: {healing_events}")
 
     def _save_log(self):
         """Saves AI self-healing status."""
         with open(SELF_HEALING_LOG, "w", encoding="utf-8") as file:
             json.dump(self.status, file, indent=4)
-
+            
     def review_self_healing_status(self):
         """Displays AI self-healing and infrastructure optimization status."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, details FROM self_healing_logs ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
+
         print("\n🛠 AI Self-Healing Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"⚠️ Failed Nodes Detected: {self.status['failed_nodes']}")
-        print(f"✅ Healing Events Applied: {self.status['healing_events']}")
+        for timestamp, event_type, details in logs:
+            print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
 
 if __name__ == "__main__":
     ai_healing = AISelfHealing()
