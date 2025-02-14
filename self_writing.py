@@ -12,6 +12,7 @@ BOTTLENECK_LOG = "logs/bottleneck_functions.json"
 FUNCTIONS_LOG = "logs/function_analysis.log"
 MODIFIED_FUNCTIONS_DIR = "logs/refactored_functions"
 GOAL_LOG = "logs/autonomous_goals.json"
+FEATURE_LOG = "logs/feature_expansion.json"
 
 # OpenAI API Configuration
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -20,12 +21,14 @@ openai_model = os.getenv("OPENAI_MODEL", "gpt-4o")  # Default to GPT-4
 def extract_functions():
     """ Extracts function definitions using AST (Abstract Syntax Tree) """
     with open(TARGET_FILE, "r", encoding="utf-8") as file:
-        tree = ast.parse(file.read(), filename=TARGET_FILE)
+        source_code = file.read()
+
+    tree = ast.parse(source_code, filename=TARGET_FILE)
 
     functions = []
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef):  # Detect function definitions
-            func_code = ast.get_source_segment(file.read(), node)  # Extracts function body
+            func_code = ast.get_source_segment(source_code, node)  # Now works correctly
             functions.append(func_code)
 
     with open(FUNCTIONS_LOG, "w", encoding="utf-8") as file:
@@ -39,11 +42,18 @@ def get_target_functions():
         print("No bottleneck functions found. Skipping targeted refactoring.")
         return []
 
-    with open(BOTTLENECK_LOG, "r", encoding="utf-8") as file:
-        functions = json.load(file)
+    try:
+        with open(BOTTLENECK_LOG, "r", encoding="utf-8") as file:
+            functions = json.load(file)
+            if not functions:
+                print("Bottleneck log is empty. Skipping targeted refactoring.")
+                return []
+    except json.JSONDecodeError:
+        print("Error reading bottleneck log. Skipping targeted refactoring.")
+        return []
 
     return functions
-
+    
 def generate_refactored_functions():
     """ Sends function definitions to OpenAI for AI-powered function-level refactoring """
     os.makedirs(MODIFIED_FUNCTIONS_DIR, exist_ok=True)
@@ -85,8 +95,33 @@ def get_self_improvement_goals():
         print("No self-improvement goals found. Skipping feature expansion.")
         return []
 
-    with open(GOAL_LOG, "r", encoding="utf-8") as file:
-        goals = json.load(file)
+    try:
+        with open(GOAL_LOG, "r", encoding="utf-8") as file:
+            goals = json.load(file)
+            if not goals:
+                print("Self-improvement goals file is empty.")
+                return []
+    except json.JSONDecodeError:
+        print("Error reading self-improvement goals log. Skipping.")
+        return []
+
+    return goals
+
+def get_new_feature_goals():
+    """ Retrieves AI-generated feature expansion goals """
+    if not os.path.exists(FEATURE_LOG):
+        print("No feature expansion goals found. Skipping new development.")
+        return []
+
+    try:
+        with open(FEATURE_LOG, "r", encoding="utf-8") as file:
+            goals = json.load(file)
+            if not goals:
+                print("Feature expansion goals file is empty.")
+                return []
+    except json.JSONDecodeError:
+        print("Error reading feature expansion goals log. Skipping.")
+        return []
 
     return goals
 
@@ -124,6 +159,52 @@ def implement_self_generated_goals():
         except Exception as e:
             print(f"Error implementing self-improvement goal: {e}")
 
+def get_new_feature_goals():
+    """ Retrieves AI-generated feature expansion goals """
+    if not os.path.exists(FEATURE_LOG):
+        print("No feature expansion goals found. Skipping new development.")
+        return []
+
+    with open(FEATURE_LOG, "r", encoding="utf-8") as file:
+        goals = json.load(file)
+
+    return goals
+
+def implement_new_features():
+    """ Uses AI to implement new functionalities based on self-generated goals """
+    feature_goals = get_new_feature_goals()
+
+    for goal in feature_goals:
+        prompt = f"""
+        A new feature has been identified for expansion:
+        Goal: {goal["goal"]}
+        
+        Implement this feature in the `nyx_core.py` module.
+        Ensure compatibility with existing systems and test for functionality.
+        """
+
+        try:
+            response = openai.ChatCompletion.create(
+                model=openai_model,
+                messages=[{"role": "system", "content": "You are an advanced AI capable of self-improvement."},
+                          {"role": "user", "content": prompt}]
+            )
+
+            if "choices" in response and response["choices"]:
+                new_code = response["choices"][0]["message"]["content"]
+            else:
+                raise ValueError("Invalid response from OpenAI. No valid feature implementation returned.")
+
+            # Save new feature implementation
+            with open(f"logs/feature_expansion/{goal['goal'].replace(' ', '_')}.py", "w", encoding="utf-8") as file:
+                file.write(new_code)
+
+            print(f"Implemented new feature: {goal['goal']}")
+
+        except Exception as e:
+            print(f"Error implementing new feature: {e}")
+
 if __name__ == "__main__":
     generate_refactored_functions()
     implement_self_generated_goals()
+    implement_new_features()
