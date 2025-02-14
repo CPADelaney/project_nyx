@@ -100,6 +100,14 @@ def decide_active_agents():
     priorities = priority_manager.load_task_priorities()
     threshold = 6  # Minimum priority level required to run this cycle
 
+    # ✅ FIX: Ensure `priorities` is a dictionary
+    if isinstance(priorities, list):
+        new_priorities = {}
+        for entry in priorities:
+            if isinstance(entry, dict) and "agent" in entry and "priority" in entry:
+                new_priorities[entry["agent"]] = entry["priority"]
+        priorities = new_priorities  # ✅ Convert list to dictionary
+
     active_agents = {k: v for k, v in priorities.items() if v >= threshold}
 
     if not active_agents:
