@@ -27,17 +27,17 @@ jobs:
       - name: 📝 Ensure Logs & Required Directories Exist
         run: mkdir -p logs logs/refactored_functions logs/feature_expansion logs/rollback_snapshots src/generated_features
 
-      - name: 🔍 Run AI Self-Analysis
+      - name: 🔎 Run AI Self-Analysis
         run: python3 src/self_analysis.py || echo "⚠️ Self-analysis failed, retrying..."
 
       - name: ✅ Verify Self-Analysis Log File
         run: |
-          if [ ! -s logs/code_analysis.log ]; then
-            echo "⚠️ Warning: Log file is missing or empty! Retrying..."
+          if [ ! -s logs/code_analysis.log ] || [ ! -s logs/meta_learning.json ]; then
+            echo "⚠️ Warning: Log files missing or empty! Retrying..."
             sleep 5
             python3 src/self_analysis.py  # Retry analysis
-            if [ ! -s logs/code_analysis.log ]; then
-              echo "❌ Error: Log file is still empty after retry!"
+            if [ ! -s logs/code_analysis.log ] || [ ! -s logs/meta_learning.json ]; then
+              echo "❌ Error: Log files are still empty after retry!"
               exit 1
             fi
           fi
@@ -76,6 +76,11 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 self_writing.py
+
+      - name: ⚙️ AI Self-Diagnostic Check
+        run: |
+          echo "🔍 Running AI self-diagnostics..."
+          python3 tests/self_test.py || echo "⚠️ Self-diagnostics detected issues, continuing..."
 
       - name: ⚡ **Execute AI Agents (Parallelized)**
         env:
