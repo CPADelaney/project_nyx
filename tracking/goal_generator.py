@@ -5,6 +5,8 @@ import sqlite3
 from collections import Counter
 from datetime import datetime
 import random
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
 LOG_DB = "logs/ai_logs.db"
