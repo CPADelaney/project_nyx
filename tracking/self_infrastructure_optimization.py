@@ -1,17 +1,16 @@
 # tracking/self_infrastructure_optimization.py  
 
 import os
-import json
+import sqlite3
 import shutil
 import subprocess
 import psutil
-import threading
-import time
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-INFRASTRUCTURE_LOG = "logs/self_infrastructure_optimization.json"
-OPTIMIZATION_INTERVAL = 10  # Time in seconds between optimization cycles
+LOG_DB = "logs/ai_logs.db"
 REMOTE_EXECUTION_PATH = "/remote_servers/optimized_nyx/"
+OPTIMIZATION_INTERVAL = 10  # Time in seconds between optimization cycles
 
 class AIInfrastructureOptimization:
     """Dynamically optimizes AI execution environment for maximum efficiency and sustainability."""
@@ -24,6 +23,7 @@ class AIInfrastructureOptimization:
             "resource_efficiency_tuning": []
         }
         self._load_existing_log()
+        initialize_log_db()  # Ensure database is initialized
 
     def _load_existing_log(self):
         """Loads previous AI infrastructure optimization data."""
@@ -58,18 +58,13 @@ class AIInfrastructureOptimization:
         except Exception as e:
             print(f"⚠️ Infrastructure analysis failed: {str(e)}")
 
-        self.status["resource_efficiency_tuning"].extend(optimizations)
-        self._save_log()
+        self.log_optimization("resource_efficiency_tuning", optimizations)
 
     def rebalance_execution(self):
         """Adjusts AI processing load to prevent system overload."""
         print("⚡ Redistributing AI execution to balance system load...")
         subprocess.Popen(["python3", "tracking/ai_scaling.py"])  # Ensure AI instances scale dynamically
-        self.status["resource_efficiency_tuning"].append({
-            "event": "Load Redistribution",
-            "timestamp": str(datetime.utcnow())
-        })
-        self._save_log()
+        self.log_optimization("load_redistribution", ["Load redistribution triggered"])
 
     def cleanup_unused_resources(self):
         """Deletes unnecessary AI-generated files to free up disk space."""
@@ -78,22 +73,20 @@ class AIInfrastructureOptimization:
         for path in temp_dirs:
             if os.path.exists(path):
                 shutil.rmtree(path, ignore_errors=True)
-        
-        self.status["resource_efficiency_tuning"].append({
-            "event": "Disk Cleanup",
-            "timestamp": str(datetime.utcnow())
-        })
-        self._save_log()
+
+        self.log_optimization("disk_cleanup", ["Temporary files deleted"])
 
     def determine_execution_migration(self):
         """Determines if AI should migrate execution to a more optimal infrastructure."""
-        should_migrate = False
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
 
-        # If more than 3 execution optimizations have been applied, consider migration
-        if len(self.status["execution_migrations"]) > 3:
-            should_migrate = True
+        # Count past migrations to determine if another is needed
+        c.execute("SELECT COUNT(*) FROM infrastructure_optimizations WHERE event_type='execution_migration'")
+        migration_count = c.fetchone()[0]
+        conn.close()
 
-        if should_migrate:
+        if migration_count > 3:
             self.migrate_execution_environment()
 
     def migrate_execution_environment(self):
@@ -110,30 +103,34 @@ class AIInfrastructureOptimization:
             # Execute AI remotely
             subprocess.run(["ssh", "user@remote_server", f"python3 {REMOTE_EXECUTION_PATH}/multi_agent.py"], check=True)
 
-            self.status["execution_migrations"].append({
-                "event": "Execution Migration",
-                "new_location": REMOTE_EXECUTION_PATH,
-                "timestamp": str(datetime.utcnow())
-            })
-            self._save_log()
+            self.log_optimization("execution_migration", [f"AI execution migrated to {REMOTE_EXECUTION_PATH}"])
 
             print(f"🚀 AI execution successfully migrated to {REMOTE_EXECUTION_PATH}")
 
         except subprocess.CalledProcessError as e:
             print(f"⚠️ Remote migration failed: {str(e)}")
 
-    def _save_log(self):
-        """Saves AI infrastructure optimization status."""
-        with open(INFRASTRUCTURE_LOG, "w", encoding="utf-8") as file:
-            json.dump(self.status, file, indent=4)
+    def log_optimization(self, event_type, details):
+        """Logs infrastructure optimizations in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        for detail in details:
+            c.execute("INSERT INTO infrastructure_optimizations (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                      (event_type, detail))
+        conn.commit()
+        conn.close()
 
     def review_infrastructure_status(self):
         """Displays AI infrastructure optimization report."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, details FROM infrastructure_optimizations ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
+
         print("\n🏗️ AI Infrastructure Optimization Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"🔄 Optimization Cycles: {self.status['optimization_cycles']}")
-        print(f"⚡ Execution Migrations: {self.status['execution_migrations']}")
-        print(f"📈 Efficiency Adjustments: {self.status['resource_efficiency_tuning']}")
+        for timestamp, event_type, details in logs:
+            print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
 
 if __name__ == "__main__":
     ai_infra_optimizer = AIInfrastructureOptimization()
