@@ -1,7 +1,6 @@
-# analysis/self_writer.py
-
 import os
 import shutil
+import subprocess
 
 SUGGESTIONS_FILE = "logs/optimization_suggestions.txt"
 TARGET_FILE = "src/nyx_core.py"
@@ -41,6 +40,12 @@ def apply_suggestions():
 
     print("Applied optimizations to nyx_core.py.")
 
+def trigger_self_analysis():
+    """ Runs a new self-analysis after modification """
+    print("Triggering new self-analysis cycle...")
+    subprocess.run(["python3", "analysis/self_analysis.py"])
+
 if __name__ == "__main__":
     backup_code()
     apply_suggestions()
+    trigger_self_analysis()
