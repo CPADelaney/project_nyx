@@ -27,6 +27,9 @@ jobs:
       - name: 📝 Ensure Logs & Required Directories Exist
         run: mkdir -p logs logs/refactored_functions logs/feature_expansion logs/rollback_snapshots src/generated_features
 
+      - name: 🧹 Clean Up Old Logs
+        run: find logs/ -type f -mtime +30 -delete
+
       - name: 🔎 Run AI Self-Analysis
         run: python3 src/self_analysis.py || echo "⚠️ Self-analysis failed, retrying..."
 
@@ -146,7 +149,3 @@ jobs:
         with:
           name: modified-source-code
           path: src/nyx_core.py
-
-      - name: 🧹 Clean Up Old AI Logs
-        run: find logs/ -type f -mtime +30 -delete
-
