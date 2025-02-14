@@ -1,4 +1,4 @@
-# src/multi_agent.py
+# core/multi_agent.py
 
 import sys
 import os
