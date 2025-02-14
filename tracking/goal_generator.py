@@ -21,23 +21,6 @@ class GoalGenerator:
         self._load_existing_evolution_plans()
         initialize_log_db() 
 
-    def _load_existing_goals(self):
-        """Loads previous self-improvement goals to maintain long-term tracking."""
-        if os.path.exists(GOAL_LOG):
-            try:
-                with open(GOAL_LOG, "r", encoding="utf-8") as file:
-                    self.goals = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt goal log detected. Resetting.")
-
-    def _load_existing_evolution_plans(self):
-        """Loads AI-generated evolution strategies."""
-        if os.path.exists(EVOLUTION_LOG):
-            try:
-                with open(EVOLUTION_LOG, "r", encoding="utf-8") as file:
-                    self.evolution_plans = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt evolution roadmap detected. Resetting.")
 
     def analyze_trends(self):
         """Identifies recurring inefficiencies and predicts necessary improvements."""
