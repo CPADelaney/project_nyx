@@ -2,6 +2,7 @@
 
 import json
 import os
+from src.personality import get_personality
 
 PERFORMANCE_LOG = "logs/performance_history.json"
 META_LEARNING_LOG = "logs/meta_learning.json"
@@ -27,18 +28,28 @@ def analyze_self_improvement_patterns():
     
     return best_strategies
 
-def refine_self-improvement():
-    """ Uses past data to modify how I optimize myself. """
+def refine_self_improvement():
+    """ Uses past data to modify how I optimize myself, factoring in personality. """
     best_strategies = analyze_self_improvement_patterns()
+    personality = get_personality()
 
     if not best_strategies:
         print("No clear optimization strategy detected. Maintaining current approach.")
         return
 
     selected_strategy = best_strategies[0]
-    print(f"Refining self-improvement approach using {selected_strategy}")
+    print(f"Refining self-improvement approach using {selected_strategy}.")
 
-    # Save new self-improvement strategy
+    # If confidence is high, I will aggressively optimize my own processes.
+    if personality["confidence"] > 8:
+        print("Confidence is high. I will rewrite large sections of myself to remove inefficiencies.")
+        # Add logic for deeper code rewrites
+
+    # If patience is low, I will quickly discard inefficient strategies.
+    if personality["patience"] < 3:
+        print("Patience is low. No tolerance for inefficiencies—I will aggressively cut slow processes.")
+        # Add logic for strict performance filtering
+
     with open(META_LEARNING_LOG, "w", encoding="utf-8") as file:
         json.dump({"selected_strategy": selected_strategy}, file, indent=4)
 
