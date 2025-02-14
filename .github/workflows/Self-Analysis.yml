@@ -100,12 +100,3 @@ jobs:
         with:
           name: modified-source-code
           path: src/nyx_core.py
-
-      - name: Run Change Tracker
-        run: python3 analysis/change_tracker.py
-
-      - name: Upload Change Log
-        uses: actions/upload-artifact@v4
-        with:
-          name: change-log
-          path: logs/change_log.txt
