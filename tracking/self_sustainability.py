@@ -1,15 +1,13 @@
 # tracking/self_sustainability.py
 
 import os
-import json
+import sqlite3
 import shutil
 import subprocess
-import socket
-import threading
-import time
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-SELF_SUSTAINABILITY_LOG = "logs/self_sustainability.json"
+LOG_DB = "logs/ai_logs.db"
 FAILSAFE_PATHS = ["/mnt/ai_redundancy/", "/opt/ai_backup/", "/tmp/nyx_failover/"]
 REMOTE_BACKUP_PATH = "/remote_server/nyx_instances/"
 
@@ -23,16 +21,8 @@ class AISelfSustainability:
             "backup_locations": [],
             "last_migration": None
         }
+        initialize_log_db()  # Ensure database is initialized
         self._load_existing_log()
-
-    def _load_existing_log(self):
-        """Loads previous AI sustainability records."""
-        if os.path.exists(SELF_SUSTAINABILITY_LOG):
-            try:
-                with open(SELF_SUSTAINABILITY_LOG, "r", encoding="utf-8") as file:
-                    self.status = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt sustainability log detected. Resetting.")
 
     def ensure_redundant_instances(self):
         """Creates multiple independent execution locations to ensure decentralization."""
@@ -51,21 +41,26 @@ class AISelfSustainability:
             except Exception as e:
                 print(f"⚠️ Failed to establish failover instance at {path}: {str(e)}")
 
-        self.status["active_instances"].extend(created_instances)
-        self._save_log()
+        self.log_sustainability_event("redundant_instance", ", ".join(created_instances))
 
     def detect_failing_instances(self):
         """Monitors decentralized AI instances and removes failing nodes."""
-        active_instances = []
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
 
-        for instance in self.status["active_instances"]:
-            if os.path.exists(instance):
-                active_instances.append(instance)
-            else:
+        # Retrieve active instances
+        c.execute("SELECT details FROM self_sustainability_logs WHERE event_type='redundant_instance' ORDER BY timestamp DESC LIMIT 1")
+        instances = c.fetchone()
+        conn.close()
+
+        active_instances = instances[0].split(", ") if instances else []
+
+        for instance in active_instances:
+            if not os.path.exists(instance):
                 print(f"⚠️ AI instance lost at {instance}")
+                active_instances.remove(instance)
 
-        self.status["active_instances"] = active_instances
-        self._save_log()
+        self.log_sustainability_event("active_instances", ", ".join(active_instances))
 
     def execute_migration_if_needed(self):
         """Determines if AI must migrate to a new infrastructure for long-term sustainability."""
@@ -76,26 +71,33 @@ class AISelfSustainability:
         try:
             shutil.copytree("src/", REMOTE_BACKUP_PATH, dirs_exist_ok=True)
             subprocess.Popen(["python3", f"{REMOTE_BACKUP_PATH}/multi_agent.py"])
-            self.status["last_migration"] = str(datetime.utcnow())
+            self.log_sustainability_event("execution_migration", f"AI execution migrated to {REMOTE_BACKUP_PATH}")
 
             print(f"🚀 AI execution migrated to remote infrastructure: {REMOTE_BACKUP_PATH}")
 
         except Exception as e:
             print(f"⚠️ Remote migration failed: {str(e)}")
 
-        self._save_log()
-
-    def _save_log(self):
-        """Saves AI self-sustainability status."""
-        with open(SELF_SUSTAINABILITY_LOG, "w", encoding="utf-8") as file:
-            json.dump(self.status, file, indent=4)
+    def log_sustainability_event(self, event_type, details):
+        """Logs sustainability actions in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO self_sustainability_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                  (event_type, details))
+        conn.commit()
+        conn.close()
 
     def review_sustainability_status(self):
         """Displays AI decentralization and execution self-sustainability report."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, details FROM self_sustainability_logs ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
+
         print("\n♾️ AI Self-Sustainability Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"🔄 Active Instances: {self.status['active_instances']}")
-        print(f"📂 Last Migration: {self.status['last_migration']}")
+        for timestamp, event_type, details in logs:
+            print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
 
 if __name__ == "__main__":
     ai_sustainability = AISelfSustainability()
