@@ -2,8 +2,11 @@
 
 import os
 import json
+import subprocess
 from collections import Counter
+from datetime import datetime
 
+# File Paths
 PERFORMANCE_LOG = "logs/performance_history.json"
 GOAL_LOG = "logs/autonomous_goals.json"
 FEATURE_LOG = "logs/feature_expansion.json"
@@ -40,7 +43,7 @@ class FeatureExpansion:
             json.dump(memory_data, file, indent=4)
 
     def analyze_missing_capabilities(self):
-        """Scans past improvements and identifies persistent inefficiencies."""
+        """Scans past improvements and identifies missing or underdeveloped features."""
         if not os.path.exists(PERFORMANCE_LOG):
             print("⚠️ No performance history found. Skipping feature expansion analysis.")
             return []
@@ -52,41 +55,79 @@ class FeatureExpansion:
         for entry in history:
             if "slowest_functions" in entry:
                 recurring_issues.update(entry["slowest_functions"])
+            if "missing_capabilities" in entry:
+                for feature in entry["missing_capabilities"]:
+                    recurring_issues[feature] += 1  # Track features Nyx has identified as needed
 
-        # Identify features that repeatedly show inefficiencies
-        common_issues = [func for func, count in recurring_issues.items() if count > 3]
-
-        missing_features = []
-        if "decision_making" not in history:
-            missing_features.append("Enhance reinforcement learning for adaptive decision-making.")
-        if len(common_issues) > 3:
-            missing_features.append("Implement a dynamic AI task load balancer.")
+        missing_features = [feature for feature, count in recurring_issues.items() if count > 2]  # More than 2 occurrences
 
         return missing_features
 
     def generate_new_feature_goals(self):
-        """Generates new AI self-improvement goals based on persistent inefficiencies."""
+        """Generates new AI-driven features based on persistent inefficiencies."""
         missing_features = self.analyze_missing_capabilities()
 
         if not missing_features:
             print("✅ No critical missing features detected.")
             return
 
-        new_goals = [{"goal": feature, "status": "pending"} for feature in missing_features]
+        new_goals = []
+        for feature in missing_features:
+            new_goals.append({
+                "goal": f"Develop {feature} to enhance AI efficiency.",
+                "status": "pending",
+                "last_updated": str(datetime.utcnow())
+            })
 
         with open(FEATURE_LOG, "w", encoding="utf-8") as file:
             json.dump(new_goals, file, indent=4)
 
-        print(f"📌 Generated {len(new_goals)} new AI self-improvement goals.")
+        print(f"📌 Generated {len(new_goals)} new AI feature expansion goals.")
 
-    def store_thought(self, thought_id, description):
-        """Stores an AI self-improvement idea in short-term memory."""
-        self.short_term_memory[thought_id] = description
-        self._save_memory()
-        print(f"📝 Thought {thought_id} stored: {description}")
+    def self_generate_feature_code(self):
+        """Generates new AI functionality based on detected feature gaps."""
+        if not os.path.exists(FEATURE_LOG):
+            print("⚠️ No feature expansion goals found.")
+            return
+
+        with open(FEATURE_LOG, "r", encoding="utf-8") as file:
+            feature_goals = json.load(file)
+
+        if not feature_goals:
+            print("✅ No pending feature expansions.")
+            return
+
+        print("⚙️ Generating AI-driven feature implementations...")
+        for goal in feature_goals:
+            if goal["status"] == "pending":
+                feature_name = goal["goal"].replace("Develop ", "").replace(" to enhance AI efficiency.", "")
+                
+                # Generate AI code snippet for the new feature
+                ai_generated_code = f"""
+# Auto-Generated Feature: {feature_name}
+def {feature_name.replace(' ', '_').lower()}():
+    \"\"\"This function implements {feature_name}, as identified by AI.\"\"\"
+    pass
+"""
+
+                # Write new feature to a dynamic module
+                feature_file = f"src/generated_features/{feature_name.replace(' ', '_').lower()}.py"
+                os.makedirs(os.path.dirname(feature_file), exist_ok=True)
+                with open(feature_file, "w", encoding="utf-8") as file:
+                    file.write(ai_generated_code)
+
+                # Update goal status
+                goal["status"] = "in-progress"
+                goal["last_updated"] = str(datetime.utcnow())
+
+                print(f"🚀 AI-generated feature `{feature_name}` created at {feature_file}.")
+
+        # Save updated goals
+        with open(FEATURE_LOG, "w", encoding="utf-8") as file:
+            json.dump(feature_goals, file, indent=4)
 
     def finalize_thought(self, thought_id):
-        """Moves a thought from short-term to long-term memory after execution."""
+        """Moves a completed AI-generated feature to long-term memory."""
         if thought_id in self.short_term_memory:
             self.long_term_memory[thought_id] = self.short_term_memory.pop(thought_id)
             self._save_memory()
@@ -102,4 +143,5 @@ class FeatureExpansion:
 if __name__ == "__main__":
     feature_expansion = FeatureExpansion()
     feature_expansion.generate_new_feature_goals()
+    feature_expansion.self_generate_feature_code()
     feature_expansion.review_memory()
