@@ -2,24 +2,36 @@
 
 import random
 import subprocess
+import difflib
 
-TARGET_FILE = "src/nyx_core.py"
+ORIGINAL_FILE = "src/nyx_core.py"
+MODIFIED_FILE = "logs/nyx_core_modified.py"
 
-def introduce_random_bug():
-    """ Introduce a small syntax error randomly for self-testing """
-    with open(TARGET_FILE, "r", encoding="utf-8") as file:
-        lines = file.readlines()
+def compare_versions():
+    """ Compare AI-modified code with original and log differences """
+    with open(ORIGINAL_FILE, "r", encoding="utf-8") as orig, open(MODIFIED_FILE, "r", encoding="utf-8") as mod:
+        original_code = orig.readlines()
+        modified_code = mod.readlines()
 
-    if len(lines) > 5:
-        corrupt_line = random.randint(0, len(lines) - 1)
-        lines[corrupt_line] = lines[corrupt_line].replace(" ", "# ", 1)  # Breaks indentation
+    diff = list(difflib.unified_diff(original_code, modified_code, lineterm=''))
 
-    with open(TARGET_FILE, "w", encoding="utf-8") as file:
-        file.writelines(lines)
+    with open("logs/code_differences.txt", "w", encoding="utf-8") as diff_log:
+        diff_log.writelines(diff)
 
-    print("Introduced a random bug for mutation testing.")
+    print("Code differences logged.")
+
+def test_modified_code():
+    """ Runs tests on AI-modified code to ensure functionality is preserved """
+    result = subprocess.run(["python3", "-m", "unittest", "tests/self_test.py"], capture_output=True, text=True)
+
+    if result.returncode == 0:
+        print("AI-modified code passed all tests! Ready for deployment.")
+        return True
+    else:
+        print("AI-modified code failed tests. Keeping original version.")
+        return False
 
 if __name__ == "__main__":
-    introduce_random_bug()
-    subprocess.run(["python3", "tests/self_test.py"])
-
+    compare_versions()
+    if test_modified_code():
+        subprocess.run(["mv", MODIFIED_FILE, ORIGINAL_FILE])  # Replace old file with improved version
