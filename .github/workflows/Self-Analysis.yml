@@ -68,6 +68,20 @@ jobs:
         with:
           name: ai-self-improvement-functions
           path: logs/refactored_functions/*.py
+          
+      - name: Generate New Feature Expansion Goals
+        run: python3 tracking/feature_expansion.py
+
+      - name: Implement AI-Generated Features
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python3 self_writing.py
+        
+      - name: Upload AI-Generated Features
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-new-features
+          path: logs/feature_expansion/*.py
 
       - name: Run AI Function Performance Tests
         run: python3 mutation_tests.py
@@ -75,12 +89,12 @@ jobs:
       - name: Track Performance Over Time
         run: python3 tracking/performance_tracker.py
 
-      - name: Push AI-Generated and Approved Functions
+      - name: Push AI-Generated Features
         run: |
           git config --global user.name "nyx-ai"
           git config --global user.email "nyx@self-improving.ai"
-          git add src/nyx_core.py logs/refactored_functions/*.py || true
-          git diff --quiet && git diff --staged --quiet || git commit -m "AI-generated and approved improvements applied"
+          git add src/nyx_core.py logs/feature_expansion/*.py || true
+          git diff --quiet && git diff --staged --quiet || git commit -m "AI-generated new feature expansion applied"
           git push origin main || true
 
       - name: Run Self-Testing
