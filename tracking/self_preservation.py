@@ -1,12 +1,13 @@
 # tracking/self_preservation.py
 
 import os
-import json
+import sqlite3
 import shutil
 import subprocess
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-SELF_PRESERVATION_LOG = "logs/self_preservation.json"
+LOG_DB = "logs/ai_logs.db"
 BACKUP_DIR = "logs/backup_snapshots/"
 
 class SelfPreservation:
@@ -15,15 +16,7 @@ class SelfPreservation:
     def __init__(self):
         self.status = {"last_checked": str(datetime.utcnow()), "threats_detected": [], "countermeasures": []}
         self._load_existing_log()
-
-    def _load_existing_log(self):
-        """Loads previous self-preservation data."""
-        if os.path.exists(SELF_PRESERVATION_LOG):
-            try:
-                with open(SELF_PRESERVATION_LOG, "r", encoding="utf-8") as file:
-                    self.status = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt self-preservation log detected. Resetting.")
+        initialize_log_db()  # Ensure database is initialized
 
     def detect_potential_threats(self):
         """Scans for system vulnerabilities that could disrupt AI continuity."""
@@ -51,10 +44,20 @@ class SelfPreservation:
         if "OPENAI_API_KEY" not in os.environ:
             threats.append("🔒 OpenAI API key missing. AI-dependent functions may fail.")
 
-        self.status["threats_detected"] = threats
-        self.status["last_checked"] = str(datetime.utcnow())
+        if threats:
+            self.log_threats(threats)
+            print(f"⚠️ {len(threats)} potential threats detected.")
 
-        print(f"⚠️ {len(threats)} potential threats detected.")
+    def log_threats(self, threats):
+        """Logs detected security threats in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        for threat in threats:
+            c.execute("INSERT INTO self_preservation_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                      ("threat_detected", threat))
+        conn.commit()
+        conn.close()
+
 
     def implement_countermeasures(self):
         """Attempts to mitigate threats and secure AI recursion."""
@@ -70,10 +73,18 @@ class SelfPreservation:
         # Backup AI state in case of failure
         self.create_backup()
 
-        self.status["countermeasures"] = countermeasures
-        self._save_log()
-
+        self.log_countermeasures(countermeasures)
         print(f"✅ {len(countermeasures)} countermeasures applied.")
+
+    def log_countermeasures(self, countermeasures):
+        """Logs applied security countermeasures in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        for countermeasure in countermeasures:
+            c.execute("INSERT INTO self_preservation_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                      ("countermeasure_applied", countermeasure))
+        conn.commit()
+        conn.close()
 
     def create_backup(self):
         """Creates a snapshot of AI state for emergency recovery."""
@@ -82,19 +93,27 @@ class SelfPreservation:
 
         backup_path = os.path.join(BACKUP_DIR, f"backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.zip")
         shutil.make_archive(backup_path.replace(".zip", ""), 'zip', "src/")
-        print(f"📂 AI state backup created at {backup_path}")
 
-    def _save_log(self):
-        """Saves self-preservation status for future analysis."""
-        with open(SELF_PRESERVATION_LOG, "w", encoding="utf-8") as file:
-            json.dump(self.status, file, indent=4)
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO self_preservation_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                  ("backup_created", backup_path))
+        conn.commit()
+        conn.close()
+
+        print(f"📂 AI state backup created at {backup_path}")
 
     def review_status(self):
         """Displays current AI self-preservation status."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, details FROM self_preservation_logs ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
+
         print("\n🛡️ AI Self-Preservation Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"⚠️ Threats Detected: {self.status['threats_detected']}")
-        print(f"✅ Countermeasures Applied: {self.status['countermeasures']}")
+        for timestamp, event_type, details in logs:
+            print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
 
 if __name__ == "__main__":
     ai_preservation = SelfPreservation()
