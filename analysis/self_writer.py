@@ -45,7 +45,15 @@ def trigger_self_analysis():
     print("Triggering new self-analysis cycle...")
     subprocess.run(["python3", "analysis/self_analysis.py"])
 
+def commit_and_push_changes():
+    """ Commits and pushes self-modifications to GitHub """
+    subprocess.run(["git", "add", "src/nyx_core.py"])
+    subprocess.run(["git", "commit", "-m", "Automated self-improvement cycle"])
+    subprocess.run(["git", "push", "origin", "main"])
+
 if __name__ == "__main__":
     backup_code()
     apply_suggestions()
     trigger_self_analysis()
+    commit_and_push_changes()
+
