@@ -2,7 +2,8 @@
 
 import json
 import os
-from src.personality import get_personality
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from core.personality import get_personality
 
 PERFORMANCE_LOG = "logs/performance_history.json"
 TASK_PRIORITY_LOG = "logs/task_priority.json"
