@@ -8,6 +8,16 @@ import timeit
 
 LOG_FILE = "logs/performance_history.json"
 TARGET_FILE = "src/nyx_core.py"
+PERFORMANCE_LOG = "logs/performance_history.json"
+
+def ensure_performance_log():
+    """ Ensures performance log exists and is properly formatted. """
+    if not os.path.exists(PERFORMANCE_LOG):
+        with open(PERFORMANCE_LOG, "w", encoding="utf-8") as file:
+            json.dump([], file, indent=4)  # ✅ Ensure a valid JSON list structure
+        print("✅ Initialized performance history log.")
+
+ensure_performance_log()
 
 def measure_execution_time():
     """ Measures execution time of nyx_core.py in a controlled subprocess """
