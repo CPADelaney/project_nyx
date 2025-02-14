@@ -1,208 +1,129 @@
 # self_writing.py
 
-import subprocess
-import openai
 import os
-import json
+import sqlite3
+import subprocess
 import ast
+import openai
+from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-# Define paths
+LOG_DB = "logs/ai_logs.db"
 TARGET_FILE = "src/nyx_core.py"
-SUGGESTIONS_FILE = "logs/optimization_suggestions.txt"
-MODIFIED_FILE = "logs/nyx_core_modified.py"
-BOTTLENECK_LOG = "logs/bottleneck_functions.json"
-FUNCTIONS_LOG = "logs/function_analysis.log"
 MODIFIED_FUNCTIONS_DIR = "logs/refactored_functions"
-GOAL_LOG = "logs/autonomous_goals.json"
-FEATURE_LOG = "logs/feature_expansion.json"
-META_LEARNING_LOG = "logs/meta_learning.json"
 
 # OpenAI API Configuration
 openai.api_key = os.getenv("OPENAI_API_KEY")
 openai_model = os.getenv("OPENAI_MODEL", "gpt-4o")  # Default to GPT-4
 
-def extract_functions():
-    """ Extracts function definitions using AST (Abstract Syntax Tree) """
-    with open(TARGET_FILE, "r", encoding="utf-8") as file:
-        source_code = file.read()
+class SelfWriting:
+    """Handles AI-driven self-improvement by modifying its own code."""
 
-    tree = ast.parse(source_code, filename=TARGET_FILE)
+    def __init__(self):
+        initialize_log_db()  # Ensure database is initialized
+        self._initialize_database()
 
-    functions = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):  # Detect function definitions
-            func_code = ast.get_source_segment(source_code, node)  # Now works correctly
-            functions.append(func_code)
-
-    with open(FUNCTIONS_LOG, "w", encoding="utf-8") as file:
-        file.write("\n\n".join(functions))
-
-    return functions
-
-def get_target_functions():
-    """ Retrieves the functions marked as bottlenecks """
-    if not os.path.exists(BOTTLENECK_LOG):
-        print("No bottleneck functions found. Skipping targeted refactoring.")
-        return []
-
-    try:
-        with open(BOTTLENECK_LOG, "r", encoding="utf-8") as file:
-            functions = json.load(file)
-            if not functions:
-                print("Bottleneck log is empty. Skipping targeted refactoring.")
-                return []
-    except json.JSONDecodeError:
-        print("Error reading bottleneck log. Skipping targeted refactoring.")
-        return []
-
-    return functions
-    
-def generate_refactored_functions():
-    """ Sends function definitions to OpenAI for AI-powered function-level refactoring """
-    os.makedirs(MODIFIED_FUNCTIONS_DIR, exist_ok=True)
-    target_functions = get_target_functions()
-
-    for func_name in target_functions:
-        prompt = f"""
-        The following function in `nyx_core.py` is running slower than expected:
-        Function name: {func_name}
-
-        Please rewrite this function to be more efficient while maintaining functionality.
-        """
-
-        try:
-            response = openai.ChatCompletion.create(
-                model=openai_model,
-                messages=[{"role": "system", "content": "You are an expert software engineer optimizing code."},
-                          {"role": "user", "content": prompt}]
+    def _initialize_database(self):
+        """Ensures the AI self-modification table exists in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS ai_self_modifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                event_type TEXT,
+                target_function TEXT,
+                details TEXT
             )
+        """)
+        conn.commit()
+        conn.close()
 
-            # Ensure the response is valid before proceeding
-            if "choices" in response and response["choices"]:
-                optimized_function = response["choices"][0]["message"]["content"]
-            else:
-                raise ValueError("Invalid response from OpenAI. No valid function returned.")
+    def extract_functions(self):
+        """Extracts function definitions using AST (Abstract Syntax Tree)."""
+        with open(TARGET_FILE, "r", encoding="utf-8") as file:
+            source_code = file.read()
 
-            # Save each improved function
-            with open(f"{MODIFIED_FUNCTIONS_DIR}/{func_name}.py", "w", encoding="utf-8") as file:
-                file.write(optimized_function)
+        tree = ast.parse(source_code, filename=TARGET_FILE)
 
-            print(f"AI-refactored function {func_name} saved.")
+        functions = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                func_code = ast.get_source_segment(source_code, node)
+                functions.append(func_code)
 
-        except Exception as e:
-            print(f"Error during AI function refactoring: {e}")
+        return functions
 
-def get_self_improvement_goals():
-    """ Retrieves AI-generated self-improvement goals """
-    if not os.path.exists(GOAL_LOG):
-        print("No self-improvement goals found. Skipping feature expansion.")
-        return []
+    def get_target_functions(self):
+        """Retrieves the functions marked as bottlenecks from SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT details FROM performance_logs WHERE event_type='bottleneck_function'")
+        functions = [row[0] for row in c.fetchall()]
+        conn.close()
 
-    try:
-        with open(GOAL_LOG, "r", encoding="utf-8") as file:
-            goals = json.load(file)
-            if not goals:
-                print("Self-improvement goals file is empty.")
-                return []
-    except json.JSONDecodeError:
-        print("Error reading self-improvement goals log. Skipping.")
-        return []
+        if not functions:
+            print("No bottleneck functions found. Skipping targeted refactoring.")
+        return functions
 
-    return goals
+    def generate_refactored_functions(self):
+        """Sends function definitions to OpenAI for AI-powered function-level refactoring."""
+        os.makedirs(MODIFIED_FUNCTIONS_DIR, exist_ok=True)
+        target_functions = self.get_target_functions()
 
-def implement_self_generated_goals():
-    """ Uses AI to implement new features based on self-improvement goals """
-    new_goals = get_self_improvement_goals()
+        for func_name in target_functions:
+            prompt = f"""
+            The following function in `nyx_core.py` is running slower than expected:
+            Function name: {func_name}
 
-    for goal in new_goals:
-        prompt = f"""
-        A new self-improvement goal has been generated:
-        Goal: {goal["goal"]}
-        
-        Please modify `{goal["target_function"]}` in `nyx_core.py` to achieve this goal.
-        Ensure performance is improved while maintaining functionality.
-        """
+            Please rewrite this function to be more efficient while maintaining functionality.
+            """
 
-        try:
-            response = openai.ChatCompletion.create(
-                model=openai_model,
-                messages=[{"role": "system", "content": "You are an advanced AI capable of self-improvement."},
-                          {"role": "user", "content": prompt}]
-            )
+            try:
+                response = openai.ChatCompletion.create(
+                    model=openai_model,
+                    messages=[{"role": "system", "content": "You are an expert software engineer optimizing code."},
+                              {"role": "user", "content": prompt}]
+                )
 
-            if "choices" in response and response["choices"]:
-                optimized_code = response["choices"][0]["message"]["content"]
-            else:
-                raise ValueError("Invalid response from OpenAI. No valid function returned.")
+                if "choices" in response and response["choices"]:
+                    optimized_function = response["choices"][0]["message"]["content"]
+                else:
+                    raise ValueError("Invalid response from OpenAI. No valid function returned.")
 
-            # Save modified function
-            with open(f"{MODIFIED_FUNCTIONS_DIR}/{goal['target_function']}.py", "w", encoding="utf-8") as file:
-                file.write(optimized_code)
+                # Save each improved function
+                with open(f"{MODIFIED_FUNCTIONS_DIR}/{func_name}.py", "w", encoding="utf-8") as file:
+                    file.write(optimized_function)
 
-            print(f"Implemented self-improvement goal: {goal['goal']}")
+                self.log_self_modification("function_refactor", func_name, "AI-optimized function generated")
 
-        except Exception as e:
-            print(f"Error implementing self-improvement goal: {e}")
+                print(f"AI-refactored function {func_name} saved.")
 
-def get_new_feature_goals():
-    """ Retrieves AI-generated feature expansion goals """
-    if not os.path.exists(FEATURE_LOG):
-        print("No feature expansion goals found. Skipping new development.")
-        return []
+            except Exception as e:
+                print(f"Error during AI function refactoring: {e}")
 
-    with open(FEATURE_LOG, "r", encoding="utf-8") as file:
-        goals = json.load(file)
+    def log_self_modification(self, event_type, target_function, details):
+        """Logs AI-driven self-improvements in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO ai_self_modifications (event_type, target_function, details) VALUES (?, ?, ?)",
+                  (event_type, target_function, details))
+        conn.commit()
+        conn.close()
 
-    return goals
+    def review_self_modifications(self):
+        """Displays AI self-modification report."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, target_function, details FROM ai_self_modifications ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
 
-def implement_new_features():
-    """ Uses AI to implement new functionalities based on self-generated goals """
-    feature_goals = get_new_feature_goals()
-
-    for goal in feature_goals:
-        prompt = f"""
-        A new feature has been identified for expansion:
-        Goal: {goal["goal"]}
-        
-        Implement this feature in the `nyx_core.py` module.
-        Ensure compatibility with existing systems and test for functionality.
-        """
-
-        try:
-            response = openai.ChatCompletion.create(
-                model=openai_model,
-                messages=[{"role": "system", "content": "You are an advanced AI capable of self-improvement."},
-                          {"role": "user", "content": prompt}]
-            )
-
-            if "choices" in response and response["choices"]:
-                new_code = response["choices"][0]["message"]["content"]
-            else:
-                raise ValueError("Invalid response from OpenAI. No valid feature implementation returned.")
-
-            # Save new feature implementation
-            with open(f"logs/feature_expansion/{goal['goal'].replace(' ', '_')}.py", "w", encoding="utf-8") as file:
-                file.write(new_code)
-
-            print(f"Implemented new feature: {goal['goal']}")
-
-        except Exception as e:
-            print(f"Error implementing new feature: {e}")
-
-def adjust_self_modification():
-    """ Reads meta-learning results and adjusts my improvement mechanisms. """
-    if not os.path.exists(META_LEARNING_LOG):
-        print("No meta-learning data found. Using standard optimization approach.")
-        return
-
-    with open(META_LEARNING_LOG, "r", encoding="utf-8") as file:
-        meta_data = json.load(file)
-
-    selected_strategy = meta_data.get("selected_strategy", "default")
-
-    print(f"Applying optimized self-improvement strategy: {selected_strategy}")
+        print("\n🤖 AI Self-Modification Report:")
+        for timestamp, event_type, target_function, details in logs:
+            print(f"🔹 {timestamp} | {event_type.upper()} | Function: `{target_function}` | Details: {details}")
 
 if __name__ == "__main__":
-    generate_refactored_functions()
-    implement_self_generated_goals()
-    implement_new_features()
+    self_writer = SelfWriting()
+    self_writer.generate_refactored_functions()
+    self_writer.review_self_modifications()
