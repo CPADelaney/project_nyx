@@ -1,4 +1,4 @@
-# test/self_test.py
+# tests/self_test.py
 
 import unittest
 import subprocess
