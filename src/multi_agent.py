@@ -64,6 +64,14 @@ def assign_tasks(analysis_results):
 
     return tasks
 
+def get_openai_client():
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not found in environment")
+    # You might just use openai, but if you want to keep a custom "OpenAI" usage, do so:
+    openai.api_key = api_key
+    return openai  # the standard openai module
+
 def generate_ai_response(task):
     """Uses OpenAI client to generate responses for each AI agent task."""
     personality = get_personality()
