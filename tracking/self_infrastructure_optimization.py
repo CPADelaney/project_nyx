@@ -1,5 +1,5 @@
 # tracking/self_infrastructure_optimization.py  
-
+import sys
 import os
 import sqlite3
 import shutil
