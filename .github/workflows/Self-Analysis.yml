@@ -25,10 +25,7 @@ jobs:
         run: pip install pylint openai
 
       - name: Ensure Logs Directory Exists
-        run: mkdir -p logs
-
-      - name: Ensure Log Directory and File Exists
-        run: mkdir -p logs && touch logs/code_analysis.log
+        run: mkdir -p logs logs/refactored_functions
 
       - name: Run Self-Analysis Script
         run: python3 src/self_analysis.py || echo "Self-analysis script failed, continuing..."
@@ -58,15 +55,18 @@ jobs:
       - name: Detect Bottlenecks in Code
         run: python3 tracking/bottleneck_detector.py
 
-      - name: Run AI Targeted Refactoring
+      - name: Generate Autonomous Self-Improvement Goals
+        run: python3 tracking/goal_generator.py
+
+      - name: Implement AI-Generated Improvements
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 self_writing.py
 
-      - name: Upload AI-Refactored Functions
+      - name: Upload AI-Generated Improvements
         uses: actions/upload-artifact@v4
         with:
-          name: ai-refactored-functions
+          name: ai-self-improvement-functions
           path: logs/refactored_functions/*.py
 
       - name: Run AI Function Performance Tests
@@ -75,15 +75,12 @@ jobs:
       - name: Track Performance Over Time
         run: python3 tracking/performance_tracker.py
 
-      - name: Decide Whether to Keep AI Changes
-        run: python3 mutation_tests.py
-
-      - name: Push AI-Approved Functions
+      - name: Push AI-Generated and Approved Functions
         run: |
           git config --global user.name "nyx-ai"
           git config --global user.email "nyx@self-improving.ai"
           git add src/nyx_core.py logs/refactored_functions/*.py || true
-          git diff --quiet && git diff --staged --quiet || git commit -m "AI function refactoring applied"
+          git diff --quiet && git diff --staged --quiet || git commit -m "AI-generated and approved improvements applied"
           git push origin main || true
 
       - name: Run Self-Testing
