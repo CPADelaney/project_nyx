@@ -110,24 +110,6 @@ def get_self_improvement_goals():
 
     return goals
 
-def get_new_feature_goals():
-    """ Retrieves AI-generated feature expansion goals """
-    if not os.path.exists(FEATURE_LOG):
-        print("No feature expansion goals found. Skipping new development.")
-        return []
-
-    try:
-        with open(FEATURE_LOG, "r", encoding="utf-8") as file:
-            goals = json.load(file)
-            if not goals:
-                print("Feature expansion goals file is empty.")
-                return []
-    except json.JSONDecodeError:
-        print("Error reading feature expansion goals log. Skipping.")
-        return []
-
-    return goals
-
 def implement_self_generated_goals():
     """ Uses AI to implement new features based on self-improvement goals """
     new_goals = get_self_improvement_goals()
