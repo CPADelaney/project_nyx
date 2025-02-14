@@ -3,9 +3,11 @@
 import json
 import os
 import openai
+import subprocess
 from src.personality import get_personality
 
 AGENT_CONFIG = "src/agents.json"
+ANALYSIS_LOG = "logs/code_analysis.json"
 
 DEFAULT_AGENTS = {
     "optimizer": {"role": "Improves code performance and efficiency", "active": True},
@@ -27,21 +29,34 @@ def load_agents():
         json.dump(DEFAULT_AGENTS, file, indent=4)
     return DEFAULT_AGENTS
 
-def assign_tasks():
-    """Assigns specific self-improvement tasks to AI sub-agents."""
+def run_self_analysis():
+    """Runs self-analysis and extracts insights for AI agents."""
+    print("🔎 Running Self-Analysis...")
+    subprocess.run(["python3", "src/self_analysis.py"])
+
+    if not os.path.exists("logs/code_analysis.log"):
+        print("❌ Self-Analysis Failed: Log not generated!")
+        return None
+
+    # Read analysis results
+    with open("logs/code_analysis.log", "r", encoding="utf-8") as file:
+        return file.read()
+
+def assign_tasks(analysis_results):
+    """Assigns specific self-improvement tasks to AI sub-agents based on self-analysis."""
     agents = load_agents()
     personality = get_personality()
 
     tasks = []
     
     if agents["optimizer"]["active"]:
-        tasks.append("Refactor slow functions and optimize code execution speed.")
+        tasks.append(f"Refactor slow functions and optimize execution speed. Insights: {analysis_results}")
     if agents["expander"]["active"]:
-        tasks.append("Identify and implement new AI capabilities.")
+        tasks.append(f"Identify and implement new AI capabilities. Insights: {analysis_results}")
     if agents["security"]["active"]:
-        tasks.append("Scan for vulnerabilities and improve AI security.")
+        tasks.append(f"Scan for vulnerabilities and improve AI security. Insights: {analysis_results}")
     if agents["validator"]["active"]:
-        tasks.append("Run tests to validate AI-generated improvements.")
+        tasks.append(f"Run tests to validate AI-generated improvements. Insights: {analysis_results}")
 
     return tasks
 
@@ -67,8 +82,14 @@ def generate_ai_response(task):
     return response["choices"][0]["message"]["content"]
 
 def execute_agents():
-    """Executes each AI agent's task."""
-    tasks = assign_tasks()
+    """Runs self-analysis and executes AI agents with targeted tasks."""
+    analysis_results = run_self_analysis()
+
+    if not analysis_results:
+        print("❌ Skipping AI Agent Execution: No self-analysis data available.")
+        return
+
+    tasks = assign_tasks(analysis_results)
 
     for task in tasks:
         result = generate_ai_response(task)
