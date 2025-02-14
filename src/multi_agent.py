@@ -65,9 +65,10 @@ def assign_tasks(analysis_results):
     return tasks
 
 def generate_ai_response(task):
-    """Uses OpenAI to generate responses for each AI agent task."""
+    """Uses OpenAI client to generate responses for each AI agent task."""
     personality = get_personality()
-    
+    client = get_openai_client()
+
     prompt = f"""
     Task: {task}
 
@@ -77,13 +78,21 @@ def generate_ai_response(task):
     The response should be direct, efficient, and highly optimized for recursion.
     """
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",
-        messages=[{"role": "system", "content": "You are an advanced AI improving itself."},
-                  {"role": "user", "content": prompt}]
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an advanced AI improving itself."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=300
+        )
+        return response.choices[0].message.content
 
-    return response["choices"][0]["message"]["content"]
+    except openai.OpenAIError as e:
+        print(f"❌ OpenAI API error: {e}")
+        return "Error generating AI response."
 
 def execute_agents():
     """Runs self-analysis and executes AI agents with targeted tasks."""
