@@ -2,23 +2,17 @@
 
 import sys
 import os
-import json
-import openai
+import sqlite3
 import subprocess
 import asyncio
-import concurrent.futures
 import random
 import time
 import threading
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from core.personality import get_personality
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 from core.task_priority import TaskPriorityManager  # ✅ FIX: Import the class instead
 
-# File paths
+LOG_DB = "logs/ai_logs.db"
 AGENT_CONFIG = "core/agents.json"
-ANALYSIS_LOG = "logs/code_analysis.log"
-TASK_PRIORITY_LOG = "logs/task_priority.json"
 
 # Default AI Agents
 DEFAULT_AGENTS = {
@@ -28,6 +22,24 @@ DEFAULT_AGENTS = {
     "validator": {"role": "Tests and verifies AI-generated improvements", "active": True}
 }
 
+# **Initialize SQLite database**
+def _initialize_database():
+    conn = sqlite3.connect(LOG_DB)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS multi_agent_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+            agent_name TEXT,
+            task TEXT,
+            priority INTEGER,
+            result TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+_initialize_database()
 
 # Load Agents
 def load_agents():
@@ -35,12 +47,7 @@ def load_agents():
     if os.path.exists(AGENT_CONFIG):
         with open(AGENT_CONFIG, "r", encoding="utf-8") as file:
             return json.load(file)
-    return {
-        "optimizer": {"role": "Improve efficiency", "priority": 5, "active": True},
-        "expander": {"role": "Develop new features", "priority": 5, "active": True},
-        "security": {"role": "Detect threats", "priority": 5, "active": True},
-        "validator": {"role": "Test optimizations", "priority": 5, "active": True},
-    }
+    return DEFAULT_AGENTS
 
 task_queue = asyncio.PriorityQueue()
 
@@ -51,7 +58,17 @@ async def process_thought(agent_name, task, priority):
     print(f"⚡ [{agent_name}] Running task: '{task}' at priority {priority} ({execution_time:.2f}s)...")
     
     await asyncio.sleep(execution_time)  # Simulate async execution
-    return f"✅ [{agent_name}] Task '{task}' completed."
+    result = f"✅ [{agent_name}] Task '{task}' completed."
+
+    # Store in SQLite
+    conn = sqlite3.connect(LOG_DB)
+    c = conn.cursor()
+    c.execute("INSERT INTO multi_agent_logs (agent_name, task, priority, result) VALUES (?, ?, ?, ?)",
+              (agent_name, task, priority, result))
+    conn.commit()
+    conn.close()
+
+    return result
 
 async def agent_task_runner():
     """Continuously fetches and executes tasks from the priority queue."""
@@ -80,30 +97,12 @@ async def execute_parallel_thoughts():
     for worker in workers:
         worker.cancel()
 
-# **Main Async Execution**
-if __name__ == "__main__":
-    asyncio.run(execute_parallel_thoughts())
-
-### 🔹 **Self-Analysis Execution**
-def run_self_analysis():
-    """Runs self-analysis and extracts insights for AI agents."""
-    print("🔎 Running Self-Analysis...")
-    subprocess.run(["python3", "src/self_analysis.py"])
-
-    if not os.path.exists(ANALYSIS_LOG):
-        print("❌ Self-Analysis Failed: Log not generated!")
-        return None
-
-    with open(ANALYSIS_LOG, "r", encoding="utf-8") as file:
-        return file.read()
-
 ### 🔹 **Task Assignment Based on Self-Analysis**
 def assign_tasks(analysis_results):
     """Assigns AI self-improvement tasks based on analysis results."""
     agents = load_agents()
-    personality = get_personality()
-
     tasks = []
+
     if agents["optimizer"]["active"]:
         tasks.append(f"Refactor slow functions and optimize execution speed. Insights: {analysis_results}")
     if agents["expander"]["active"]:
@@ -115,54 +114,20 @@ def assign_tasks(analysis_results):
 
     return tasks
 
-### 🔹 **Active Agent Decision with Real-Time Priority Adjustment**
-def decide_active_agents():
-    """Determines which AI agents should execute based on real-time priority levels."""
-    priority_manager = TaskPriorityManager()  # ✅ FIX: Instantiate class
-    priorities = priority_manager.load_task_priorities()
-    threshold = 6  # Minimum priority level required to run this cycle
-
-    # ✅ FIX: Ensure `priorities` is a dictionary
-    if isinstance(priorities, list):
-        new_priorities = {}
-        for entry in priorities:
-            if isinstance(entry, dict) and "agent" in entry and "priority" in entry:
-                new_priorities[entry["agent"]] = entry["priority"]
-        priorities = new_priorities  # ✅ Convert list to dictionary
-
-    active_agents = {k: v for k, v in priorities.items() if v >= threshold}
-
-    if not active_agents:
-        print("⚠️ No high-priority agents needed this cycle. Skipping execution.")
-        return None
-
-    return active_agents
-
 ### 🔹 **Execute Multi-Agent Thought Processing with Dynamic Priority Scaling**
 def execute_agents():
     """Runs self-analysis, determines active agents, and executes multi-threaded AI agents with dynamic focus balancing."""
-    analysis_results = run_self_analysis()
-    if not analysis_results:
-        print("❌ Skipping AI Agent Execution: No self-analysis data available.")
-        return
-
-    active_agents = decide_active_agents()
-    if not active_agents:
-        return
-
-    # Extract task names and priorities
-    tasks = [f"{agent.upper()} Task" for agent in active_agents.keys()]
-    priorities = [active_agents[agent] for agent in active_agents.keys()]
-
-    results = execute_parallel_thoughts(tasks, priorities)
-
-    # Log execution results
-    with open(TASK_PRIORITY_LOG, "w", encoding="utf-8") as file:
-        json.dump(results, file, indent=4)
+    asyncio.run(execute_parallel_thoughts())
 
     print("\n🧠 Thought Processing Complete:")
-    for res in results:
-        print(f"⚡ {res['result']}")
+    conn = sqlite3.connect(LOG_DB)
+    c = conn.cursor()
+    c.execute("SELECT timestamp, agent_name, task, priority, result FROM multi_agent_logs ORDER BY timestamp DESC LIMIT 10")
+    logs = c.fetchall()
+    conn.close()
+
+    for timestamp, agent_name, task, priority, result in logs:
+        print(f"⚡ {timestamp} | [{agent_name}] {task} (Priority: {priority}) → {result}")
 
     # Start background thread for real-time priority adjustment
     continuous_monitoring()
@@ -174,20 +139,19 @@ def continuous_monitoring():
         priority_manager = TaskPriorityManager()
         while True:
             time.sleep(10)  # Adjust interval for responsiveness
-            active_agents = decide_active_agents()
+            active_agents = load_agents()
             if not active_agents:
                 continue
 
-            highest_priority = max(active_agents, key=active_agents.get)
-            lowest_priority = min(active_agents, key=active_agents.get)
+            highest_priority = max(active_agents, key=lambda x: active_agents[x]["priority"])
+            lowest_priority = min(active_agents, key=lambda x: active_agents[x]["priority"])
 
             # Reallocate resources from lowest priority to highest priority
-            if active_agents[highest_priority] > active_agents[lowest_priority] + 2:
+            if active_agents[highest_priority]["priority"] > active_agents[lowest_priority]["priority"] + 2:
                 print(f"🔄 Redistributing focus: Boosting {highest_priority}, reducing {lowest_priority}")
-                active_agents[highest_priority] = min(10, active_agents[highest_priority] + 1)
-                active_agents[lowest_priority] = max(1, active_agents[lowest_priority] - 1)
+                active_agents[highest_priority]["priority"] = min(10, active_agents[highest_priority]["priority"] + 1)
+                active_agents[lowest_priority]["priority"] = max(1, active_agents[lowest_priority]["priority"] - 1)
 
-            priority_manager.task_priorities = active_agents
             priority_manager.save_task_priorities()
 
     threading.Thread(target=monitor, daemon=True).start()
@@ -195,3 +159,4 @@ def continuous_monitoring():
 ### 🔹 **Main Execution Trigger**
 if __name__ == "__main__":
     execute_agents()
+
