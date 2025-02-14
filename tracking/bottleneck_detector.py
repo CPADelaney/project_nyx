@@ -7,6 +7,7 @@ import ast
 LOG_FILE = "logs/performance_history.json"
 TARGET_FILE = "src/nyx_core.py"
 BOTTLENECK_LOG = "logs/bottleneck_functions.json"
+PERFORMANCE_LOG = "logs/performance_history.json"
 THRESHOLD_INCREASE = 1.10  # 10% increase in execution time triggers refactoring
 
 
