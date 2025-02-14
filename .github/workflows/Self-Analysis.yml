@@ -33,8 +33,13 @@ jobs:
       - name: Verify Log File Exists
         run: |
           if [ ! -s logs/code_analysis.log ]; then
-            echo "Error: Log file was not generated or is empty!"
-            exit 1
+            echo "⚠️ Warning: Log file was not generated or is empty! Retrying..."
+            sleep 5
+            python3 src/self_analysis.py  # Retry analysis
+            if [ ! -s logs/code_analysis.log ]; then
+              echo "❌ Error: Log file is still empty after retry!"
+              exit 1
+            fi
           fi
 
       - name: Upload Analysis Logs
