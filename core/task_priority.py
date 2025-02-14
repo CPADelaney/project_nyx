@@ -1,13 +1,11 @@
-# core/task_priority.py
-
 import sys
-import json
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from core.personality import get_personality
+import json
 
-PERFORMANCE_LOG = "logs/performance_history.json"
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 TASK_PRIORITY_LOG = "logs/task_priority.json"
+PERFORMANCE_LOG = "logs/performance_history.json"
 
 DEFAULT_PRIORITIES = {
     "optimizer": 5,   # Scale: 1-10 (Higher means more priority)
@@ -35,8 +33,17 @@ def adjust_task_priorities():
         print("⚠️ No performance history found. Keeping current priorities.")
         return load_task_priorities()
 
-    with open(PERFORMANCE_LOG, "r", encoding="utf-8") as file:
-        history = json.load(file)
+    try:
+        with open(PERFORMANCE_LOG, "r", encoding="utf-8") as file:
+            history = json.load(file)
+            if not history:  # ✅ Fix: Check if JSON is empty
+                print("⚠️ Performance history is empty. Keeping current priorities.")
+                return load_task_priorities()
+    except json.JSONDecodeError:
+        print("❌ Error: Performance history file is corrupt. Resetting to defaults.")
+        with open(PERFORMANCE_LOG, "w", encoding="utf-8") as file:
+            json.dump([], file, indent=4)  # ✅ Ensure a valid empty JSON list
+        return load_task_priorities()
 
     task_priorities = load_task_priorities()
 
