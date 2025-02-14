@@ -3,6 +3,7 @@
 import sys
 import os
 import json
+import random
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from core.personality import get_personality
 
