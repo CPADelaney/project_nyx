@@ -1,1 +1,6 @@
-
+pylint
+ast
+unittest
+black
+isort
+autopep8
