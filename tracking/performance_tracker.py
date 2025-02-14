@@ -1,14 +1,14 @@
 # tracking/performance_tracker.py
 
 import os
-import json
+import sqlite3
 import subprocess
 import time
 import timeit
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-LOG_FILE = "logs/performance_history.json"
+LOG_DB = "logs/ai_logs.db"
 TARGET_FILE = "src/nyx_core.py"
-PERFORMANCE_LOG = "logs/performance_history.json"
 
 def ensure_performance_log():
     """ Ensures performance log exists and is properly formatted. """
@@ -20,9 +20,9 @@ def ensure_performance_log():
 ensure_performance_log()
 
 def measure_execution_time():
-    """ Measures execution time of nyx_core.py in a controlled subprocess """
+    """Measures execution time of nyx_core.py in a controlled subprocess."""
     start_time = time.time()
-    
+
     try:
         result = subprocess.run(["python3", TARGET_FILE], capture_output=True, text=True)
         if result.returncode != 0:
@@ -37,25 +37,24 @@ def measure_execution_time():
     print(f"Execution time: {execution_time:.4f} seconds")
     return execution_time
 
+
 def update_performance_log(new_time):
-    """ Stores the latest execution time in a performance history log. """
+    """Stores the latest execution time in the performance history database."""
     if new_time is None:
         print("Skipping performance logging due to execution failure.")
         return
 
-    if os.path.exists(LOG_FILE):
-        with open(LOG_FILE, "r", encoding="utf-8") as file:
-            history = json.load(file)
-    else:
-        history = []
-
-    history.append({"timestamp": time.time(), "execution_time": new_time})
-
-    with open(LOG_FILE, "w", encoding="utf-8") as file:
-        json.dump(history, file, indent=4)
+    conn = sqlite3.connect(LOG_DB)
+    c = conn.cursor()
+    c.execute("INSERT INTO performance_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+              ("execution_time", f"{new_time:.4f} seconds"))
+    conn.commit()
+    conn.close()
 
     print(f"Logged execution time: {new_time:.4f} seconds")
 
+
 if __name__ == "__main__":
+    initialize_log_db()  # Ensure database is initialized
     execution_time = measure_execution_time()
     update_performance_log(execution_time)
