@@ -1,9 +1,7 @@
-# tracking/meta_learning.py
-
 import sys
 import os
 import json
-import random
+import random  # ✅ Fix: Import random
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from core.personality import get_personality
 
@@ -66,17 +64,9 @@ def refine_self_improvement():
             selected_strategy = random.choice(EXPERIMENTAL_STRATEGIES)
             print(f"🧪 No clear winner. Trying new strategy: {selected_strategy}")
 
-    # If confidence is high, I will aggressively optimize my own processes.
-    if personality["confidence"] > 8:
-        print("⚡ Confidence is high. I will rewrite large sections of myself to remove inefficiencies.")
-
-    # If patience is low, I will quickly discard inefficient strategies.
-    if personality["patience"] < 3:
-        print("⏳ Patience is low. No tolerance for inefficiencies—I will aggressively cut slow processes.")
-
     # Log the selected self-improvement strategy
     with open(META_LEARNING_LOG, "w", encoding="utf-8") as file:
         json.dump({"selected_strategy": selected_strategy}, file, indent=4)
 
 if __name__ == "__main__":
-    refine_self_improvement()  
+    refine_self_improvement()
