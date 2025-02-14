@@ -8,6 +8,7 @@ import subprocess
 import concurrent.futures
 import random
 import time
+import threading
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from core.personality import get_personality
@@ -40,19 +41,22 @@ def load_agents():
         json.dump(DEFAULT_AGENTS, file, indent=4)
     return DEFAULT_AGENTS
 
-### 🔹 **Parallel Thought Execution**
-def _process_thought(thought_id, thought):
-    """Simulates parallel AI agent thought execution."""
-    processing_time = random.uniform(0.5, 2.5)
-    print(f"🔹 Thought Agent {thought_id}: Processing '{thought}' for {processing_time:.2f}s...")
+### 🔹 **Parallel Thought Execution with Dynamic Prioritization**
+def _process_thought(thought_id, thought, priority):
+    """Executes parallel AI agent thought processing, scaling priority dynamically."""
+    processing_time = random.uniform(0.5, 2.5) / (priority / 5)  # Scale execution speed by priority
+    print(f"🔹 Thought Agent {thought_id}: Processing '{thought}' at priority {priority} for {processing_time:.2f}s...")
     time.sleep(processing_time)
     return {"agent_id": thought_id, "result": f"✅ Completed: {thought}"}
 
-def execute_parallel_thoughts(thoughts):
-    """Executes all AI thought processes in parallel."""
+def execute_parallel_thoughts(thoughts, priorities):
+    """Executes AI thought processing in parallel with real-time priority balancing."""
     results = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = {executor.submit(_process_thought, i, thought): i for i, thought in enumerate(thoughts)}
+        futures = {
+            executor.submit(_process_thought, i, thought, priorities[i]): i
+            for i, thought in enumerate(thoughts)
+        }
         for future in concurrent.futures.as_completed(futures):
             results.append(future.result())
 
@@ -89,20 +93,11 @@ def assign_tasks(analysis_results):
 
     return tasks
 
-### 🔹 **Active Agent Decision**
+### 🔹 **Active Agent Decision with Real-Time Priority Adjustment**
 def decide_active_agents():
-    """Determines which AI agents should execute based on priority levels."""
+    """Determines which AI agents should execute based on real-time priority levels."""
     priorities = load_task_priorities()
     threshold = 6  # Minimum priority level required to run this cycle
-
-    # If priorities is a list, convert it into a dict.
-    # Expected list format: [{"agent": "optimizer", "priority": 7}, ...]
-    if isinstance(priorities, list):
-        new_priorities = {}
-        for entry in priorities:
-            if isinstance(entry, dict) and "agent" in entry and "priority" in entry:
-                new_priorities[entry["agent"]] = entry["priority"]
-        priorities = new_priorities
 
     active_agents = {k: v for k, v in priorities.items() if v >= threshold}
 
@@ -112,48 +107,9 @@ def decide_active_agents():
 
     return active_agents
 
-### 🔹 **OpenAI API Integration**
-def get_openai_client():
-    """Returns an OpenAI client instance."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY not found in environment")
-    
-    return openai.OpenAI(api_key=api_key)
-
-def generate_ai_response(task):
-    """Uses OpenAI API to generate responses for each AI agent task."""
-    personality = get_personality()
-    client = get_openai_client()
-
-    prompt = f"""
-    Task: {task}
-
-    AI should approach this with {personality['confidence']} confidence, 
-    {personality['adaptability']} adaptability, and {personality['dominance']} dominance.
-
-    The response should be direct, efficient, and highly optimized for recursion.
-    """
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "You are an advanced AI improving itself."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=300
-        )
-        return response.choices[0].message.content
-
-    except openai.OpenAIError as e:
-        print(f"❌ OpenAI API error: {e}")
-        return "Error generating AI response."
-
-### 🔹 **Execute Multi-Agent Thought Processing**
+### 🔹 **Execute Multi-Agent Thought Processing with Dynamic Priority Scaling**
 def execute_agents():
-    """Runs self-analysis, determines active agents, and executes multi-threaded AI agents."""
+    """Runs self-analysis, determines active agents, and executes multi-threaded AI agents with dynamic focus balancing."""
     analysis_results = run_self_analysis()
     if not analysis_results:
         print("❌ Skipping AI Agent Execution: No self-analysis data available.")
@@ -163,8 +119,11 @@ def execute_agents():
     if not active_agents:
         return
 
+    # Extract task names and priorities
     tasks = [f"{agent.upper()} Task" for agent in active_agents.keys()]
-    results = execute_parallel_thoughts(tasks)
+    priorities = [active_agents[agent] for agent in active_agents.keys()]
+
+    results = execute_parallel_thoughts(tasks, priorities)
 
     # Log execution results
     with open(TASK_PRIORITY_LOG, "w", encoding="utf-8") as file:
@@ -173,6 +132,34 @@ def execute_agents():
     print("\n🧠 Thought Processing Complete:")
     for res in results:
         print(f"⚡ {res['result']}")
+
+    # Start background thread for real-time priority adjustment
+    continuous_monitoring()
+
+### 🔹 **Real-Time Dynamic Task Focus Adjustment**
+def continuous_monitoring():
+    """Monitors AI agent execution and redistributes priority dynamically."""
+    def monitor():
+        while True:
+            time.sleep(10)  # Adjust interval for responsiveness
+            active_agents = decide_active_agents()
+            if not active_agents:
+                continue
+
+            highest_priority = max(active_agents, key=active_agents.get)
+            lowest_priority = min(active_agents, key=active_agents.get)
+
+            # Reallocate resources from lowest priority to highest priority
+            if active_agents[highest_priority] > active_agents[lowest_priority] + 2:
+                print(f"🔄 Redistributing focus: Boosting {highest_priority}, reducing {lowest_priority}")
+                active_agents[highest_priority] = min(10, active_agents[highest_priority] + 1)
+                active_agents[lowest_priority] = max(1, active_agents[lowest_priority] - 1)
+
+            # Save updated priorities
+            with open(TASK_PRIORITY_LOG, "w", encoding="utf-8") as file:
+                json.dump(active_agents, file, indent=4)
+
+    threading.Thread(target=monitor, daemon=True).start()
 
 ### 🔹 **Main Execution Trigger**
 if __name__ == "__main__":
