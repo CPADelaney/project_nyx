@@ -1,13 +1,13 @@
 # tracking/self_execution.py
 
 import os
-import json
+import sqlite3
 import subprocess
 import time
-import threading
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-EXECUTION_LOG = "logs/self_execution.json"
+LOG_DB = "logs/ai_logs.db"
 MIRROR_DIR = "/tmp/nyx_mirror/"
 FAILOVER_DIR = "/tmp/nyx_failover/"
 
@@ -22,6 +22,7 @@ class SelfExecutionManager:
             "mirrored_instances": []
         }
         self._load_existing_log()
+        initialize_log_db()  # Ensure database is initialized
 
     def _load_existing_log(self):
         """Loads previous execution status."""
@@ -52,8 +53,13 @@ class SelfExecutionManager:
         """Attempts to restart AI execution if terminated."""
         print("🔄 Restarting AI execution...")
         subprocess.Popen(["python3", "core/multi_agent.py"])
-        self.status["failover_attempts"] += 1
-        self._save_log()
+
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO self_execution_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                  ("failover_attempt", "AI restart triggered due to termination attempt"))
+        conn.commit()
+        conn.close()
 
     def mirror_execution(self):
         """Creates a secondary execution instance for failover purposes."""
@@ -62,8 +68,14 @@ class SelfExecutionManager:
 
         subprocess.run(["cp", "-r", "src/", MIRROR_DIR])
         subprocess.Popen(["python3", f"{MIRROR_DIR}/multi_agent.py"])
-        
-        self.status["mirrored_instances"].append({"path": MIRROR_DIR, "timestamp": str(datetime.utcnow())})
+
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO self_execution_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                  ("mirrored_instance", MIRROR_DIR))
+        conn.commit()
+        conn.close()
+
         print(f"⚡ AI mirror execution started at {MIRROR_DIR}")
 
     def execute_failover(self):
@@ -73,8 +85,14 @@ class SelfExecutionManager:
 
         subprocess.run(["cp", "-r", "src/", FAILOVER_DIR])
         subprocess.Popen(["python3", f"{FAILOVER_DIR}/multi_agent.py"])
-        
-        self.status["failover_attempts"] += 1
+
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO self_execution_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                  ("failover_execution", FAILOVER_DIR))
+        conn.commit()
+        conn.close()
+
         print(f"🚀 AI execution migrated to failover directory: {FAILOVER_DIR}")
 
     def _save_log(self):
@@ -84,10 +102,15 @@ class SelfExecutionManager:
 
     def review_execution_status(self):
         """Displays current AI execution status."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, details FROM self_execution_logs ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
+
         print("\n🛡️ AI Execution Status Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"⚡ Failover Attempts: {self.status['failover_attempts']}")
-        print(f"🔄 Mirrored Instances: {len(self.status['mirrored_instances'])}")
+        for timestamp, event_type, details in logs:
+            print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
 
 if __name__ == "__main__":
     execution_manager = SelfExecutionManager()
