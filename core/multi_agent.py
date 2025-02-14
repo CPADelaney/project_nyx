@@ -78,24 +78,27 @@ async def agent_task_runner():
         print(result)
         task_queue.task_done()
 
+MAX_RECURSION_DEPTH = 10
+current_depth = 0
+
 async def execute_parallel_thoughts():
     """Loads tasks dynamically based on agent priority and runs them in parallel."""
+    global current_depth
+    if current_depth >= MAX_RECURSION_DEPTH:
+        print(f"⚠️ Recursive depth limit reached ({MAX_RECURSION_DEPTH}). Halting execution.")
+        return
+
+    current_depth += 1
     agents = load_agents()
     
-    # Populate Task Queue
     for agent_name, agent in agents.items():
         if agent["active"]:
             priority = agent.get("priority", 5)
             task = f"{agent_name.upper()} Task"
-            await task_queue.put((10 - priority, agent_name, task))  # Lower number = higher priority
+            await task_queue.put((10 - priority, agent_name, task))
 
-    # Spawn async workers
-    workers = [asyncio.create_task(agent_task_runner()) for _ in range(4)]  # Adjust worker count as needed
-    await task_queue.join()  # Wait until all tasks are done
-
-    # Cancel workers after execution
-    for worker in workers:
-        worker.cancel()
+    workers = [asyncio.create_task(agent_task_runner()) for _ in range(4)]
+    await task_queue.join()
 
 ### 🔹 **Task Assignment Based on Self-Analysis**
 def assign_tasks(analysis_results):
