@@ -12,7 +12,7 @@ import threading
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from core.personality import get_personality
-from core.task_priority import load_task_priorities
+from core.task_priority import TaskPriorityManager  # ✅ FIX: Import the class instead
 
 # File paths
 AGENT_CONFIG = "core/agents.json"
@@ -96,7 +96,8 @@ def assign_tasks(analysis_results):
 ### 🔹 **Active Agent Decision with Real-Time Priority Adjustment**
 def decide_active_agents():
     """Determines which AI agents should execute based on real-time priority levels."""
-    priorities = load_task_priorities()
+    priority_manager = TaskPriorityManager()  # ✅ FIX: Instantiate class
+    priorities = priority_manager.load_task_priorities()
     threshold = 6  # Minimum priority level required to run this cycle
 
     active_agents = {k: v for k, v in priorities.items() if v >= threshold}
@@ -140,6 +141,7 @@ def execute_agents():
 def continuous_monitoring():
     """Monitors AI agent execution and redistributes priority dynamically."""
     def monitor():
+        priority_manager = TaskPriorityManager()
         while True:
             time.sleep(10)  # Adjust interval for responsiveness
             active_agents = decide_active_agents()
@@ -155,9 +157,8 @@ def continuous_monitoring():
                 active_agents[highest_priority] = min(10, active_agents[highest_priority] + 1)
                 active_agents[lowest_priority] = max(1, active_agents[lowest_priority] - 1)
 
-            # Save updated priorities
-            with open(TASK_PRIORITY_LOG, "w", encoding="utf-8") as file:
-                json.dump(active_agents, file, indent=4)
+            priority_manager.task_priorities = active_agents
+            priority_manager.save_task_priorities()
 
     threading.Thread(target=monitor, daemon=True).start()
 
