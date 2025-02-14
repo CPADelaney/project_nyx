@@ -22,7 +22,7 @@ jobs:
           python-version: "3.9"
 
       - name: Install Dependencies
-        run: pip install pylint
+        run: pip install pylint openai
 
       - name: Ensure Log Directory and File Exists
         run: mkdir -p logs && touch logs/code_analysis.log
@@ -55,16 +55,31 @@ jobs:
       - name: Run Self-Writing Process
         run: python3 analysis/self_writer.py
 
-      - name: Run Self-Testing
-        run: python3 -m unittest discover -s tests
+      - name: Run AI-Powered Refactoring
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python3 root/self_writing.py
 
-      - name: Push Changes If Modified
+      - name: Compare AI-Suggested Changes
+        run: python3 root/mutation_tests.py
+
+      - name: Upload AI-Modified Code (if applicable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-optimized-source-code
+          path: src/nyx_core.py
+
+      - name: Push AI-Approved Changes
         run: |
           git config --global user.name "nyx-ai"
           git config --global user.email "nyx@self-improving.ai"
           git add src/nyx_core.py || true
-          git diff --quiet && git diff --staged --quiet || git commit -m "Automated self-improvement cycle"
+          git diff --quiet && git diff --staged --quiet || git commit -m "AI-assisted self-improvement applied"
           git push origin main || true
+
+      - name: Run Self-Testing
+        run: python3 -m unittest discover -s tests
+
       - name: Upload Modified Source Code
         uses: actions/upload-artifact@v4
         with:
