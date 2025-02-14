@@ -25,7 +25,7 @@ jobs:
         run: pip install pylint
 
       - name: Run Self-Analysis Script
-        run: python3 analysis/self_analysis.py
+        run: python3 src/self_analysis.py
 
       - name: Upload Analysis Logs
         uses: actions/upload-artifact@v4
