@@ -66,6 +66,9 @@ jobs:
       - name: Analyze Self-Improvement Patterns
         run: python3 tracking/meta_learning.py
 
+      - name: Refine Self-Improvement Strategy
+        run: python3 tracking/meta_learning.py
+
       - name: Generate New Feature Expansion Goals
         run: python3 tracking/feature_expansion.py
 
@@ -79,6 +82,9 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 core/multi_agent.py
 
+      - name: Detect & Rollback Failed AI Improvements
+        run: python3 mutation_tests.py
+
       - name: Push AI-Generated Features
         run: |
           git config --global user.name "nyx-ai"
@@ -86,6 +92,7 @@ jobs:
           git add src/nyx_core.py logs/feature_expansion/*.py || true
           git diff --quiet && git diff --staged --quiet || git commit -m "AI-generated new feature expansion applied"
           git push origin main || true
+
 
       - name: Run Self-Testing
         run: python3 -m unittest discover -s tests
