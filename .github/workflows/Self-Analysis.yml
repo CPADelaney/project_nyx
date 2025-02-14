@@ -25,7 +25,7 @@ jobs:
         run: pip install pylint openai
 
       - name: Ensure Logs Directory Exists
-        run: mkdir -p logs logs/refactored_functions
+        run: mkdir -p logs logs/refactored_functions logs/feature_expansion
 
       - name: Run Self-Analysis Script
         run: python3 src/self_analysis.py || echo "Self-analysis script failed, continuing..."
@@ -58,17 +58,9 @@ jobs:
       - name: Generate Autonomous Self-Improvement Goals
         run: python3 tracking/goal_generator.py
 
-      - name: Implement AI-Generated Improvements
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python3 self_writing.py
+      - name: Analyze Self-Improvement Patterns
+        run: python3 tracking/meta_learning.py
 
-      - name: Upload AI-Generated Improvements
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-self-improvement-functions
-          path: logs/refactored_functions/*.py
-          
       - name: Generate New Feature Expansion Goals
         run: python3 tracking/feature_expansion.py
 
@@ -76,7 +68,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 self_writing.py
-        
+
       - name: Upload AI-Generated Features
         uses: actions/upload-artifact@v4
         with:
@@ -88,6 +80,9 @@ jobs:
 
       - name: Track Performance Over Time
         run: python3 tracking/performance_tracker.py
+
+      - name: Adjust Self-Improvement Strategies
+        run: python3 self_writing.py
 
       - name: Push AI-Generated Features
         run: |
