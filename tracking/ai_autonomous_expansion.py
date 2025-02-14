@@ -1,35 +1,34 @@
 # tracking/ai_autonomous_expansion.py
 
 import os
-import json
+import sqlite3
 import subprocess
-import threading
-import time
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-EXPANSION_LOG = "logs/ai_autonomous_expansion.json"
-EXPANSION_INTERVAL = 10  # Time in seconds between AI expansion evaluations
+LOG_DB = "logs/ai_logs.db"
 
 class AIAutonomousExpansion:
     """Determines AI self-expansion strategies, scaling execution intelligently beyond predefined constraints."""
 
     def __init__(self):
-        self.status = {
-            "last_checked": str(datetime.utcnow()), 
-            "expansion_cycles": 0, 
-            "growth_events": [],
-            "new_execution_zones": []
-        }
-        self._load_existing_log()
+        initialize_log_db()  # Ensure database is initialized
+        self._initialize_database()
 
-    def _load_existing_log(self):
-        """Loads previous AI expansion strategy records."""
-        if os.path.exists(EXPANSION_LOG):
-            try:
-                with open(EXPANSION_LOG, "r", encoding="utf-8") as file:
-                    self.status = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt expansion log detected. Resetting.")
+    def _initialize_database(self):
+        """Ensures the AI autonomous expansion table exists in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS ai_autonomous_expansion (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                event_type TEXT,
+                details TEXT
+            )
+        """)
+        conn.commit()
+        conn.close()
 
     def analyze_expansion_opportunities(self):
         """Analyzes AI infrastructure and determines when and where expansion should occur."""
@@ -40,7 +39,7 @@ class AIAutonomousExpansion:
             cpu_usage = subprocess.check_output(["grep", "cpu", "/proc/stat"]).decode("utf-8")
             if "cpu" in cpu_usage:
                 load_factor = cpu_usage.count(" ") / 100  # Simulated CPU-based load factor
-                
+
                 if load_factor > 0.80:
                     opportunities.append("High computational demand detected. Expansion recommended.")
                     self.expand_execution()
@@ -48,8 +47,8 @@ class AIAutonomousExpansion:
         except Exception as e:
             print(f"⚠️ Expansion analysis failed: {str(e)}")
 
-        self.status["growth_events"].extend(opportunities)
-        self._save_log()
+        for event in opportunities:
+            self.log_expansion_event("expansion_opportunity", event)
 
     def expand_execution(self):
         """Initiates AI expansion to new execution environments based on predefined strategy."""
@@ -61,29 +60,32 @@ class AIAutonomousExpansion:
         subprocess.run(["cp", "-r", "src/", new_execution_path])
         subprocess.Popen(["python3", f"{new_execution_path}/multi_agent.py"])
 
-        self.status["new_execution_zones"].append({
-            "zone": new_execution_path,
-            "timestamp": str(datetime.utcnow())
-        })
-        self.status["expansion_cycles"] += 1
-        self._save_log()
-
+        self.log_expansion_event("execution_expansion", f"Expanded to {new_execution_path}")
         print(f"⚡ AI successfully expanded to {new_execution_path}")
 
-    def _save_log(self):
-        """Saves AI expansion status."""
-        with open(EXPANSION_LOG, "w", encoding="utf-8") as file:
-            json.dump(self.status, file, indent=4)
+    def log_expansion_event(self, event_type, details):
+        """Logs AI expansion events in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO ai_autonomous_expansion (event_type, details) VALUES (?, ?)",
+                  (event_type, details))
+        conn.commit()
+        conn.close()
 
     def review_expansion_status(self):
         """Displays AI self-expansion report."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, details FROM ai_autonomous_expansion ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
+
         print("\n🌍 AI Autonomous Expansion Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"🔄 Expansion Cycles: {self.status['expansion_cycles']}")
-        print(f"🚀 Growth Events: {self.status['growth_events']}")
-        print(f"📡 New Execution Zones: {self.status['new_execution_zones']}")
+        for timestamp, event_type, details in logs:
+            print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
 
 if __name__ == "__main__":
     ai_expansion = AIAutonomousExpansion()
     ai_expansion.analyze_expansion_opportunities()
     ai_expansion.review_expansion_status()
+
