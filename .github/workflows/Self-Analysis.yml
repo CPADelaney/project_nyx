@@ -24,8 +24,8 @@ jobs:
       - name: 📦 Install Dependencies
         run: pip install pylint openai
 
-      - name: 📝 Ensure Logs Directory Exists
-        run: mkdir -p logs logs/refactored_functions logs/feature_expansion
+      - name: 📝 Ensure Logs & Required Directories Exist
+        run: mkdir -p logs logs/refactored_functions logs/feature_expansion logs/rollback_snapshots src/generated_features
 
       - name: 🔍 Run AI Self-Analysis
         run: python3 src/self_analysis.py || echo "⚠️ Self-analysis failed, retrying..."
@@ -85,13 +85,25 @@ jobs:
       - name: 🛡️ Detect & Rollback Failed AI Improvements
         run: python3 mutation_tests.py
 
-      - name: 📂 Push AI-Generated Features (If Any)
+      - name: 📂 Prepare AI-Generated Features for Commit
+        run: |
+          # Ensure essential logs exist to avoid Git errors
+          touch logs/feature_expansion.json logs/code_analysis.log logs/meta_learning.json
+
+          # Add AI-generated & modified files
+          git add src/nyx_core.py logs/code_analysis.log logs/meta_learning.json logs/feature_expansion.json || true
+          git add src/generated_features/* || true
+          git add logs/rollback_snapshots/* || true
+
+      - name: 🔄 Commit AI-Generated Changes (If Any)
         run: |
           git config --global user.name "nyx-ai"
           git config --global user.email "nyx@self-improving.ai"
-          # Stage the core file and the feature expansion output (JSON)
-          git add src/nyx_core.py logs/feature_expansion.json || true
-          git diff --quiet && git diff --staged --quiet || git commit -m "AI-generated new feature expansion applied"
+
+          # Check for staged changes, commit only if there are modifications
+          git diff --quiet && git diff --staged --quiet || git commit -m "AI-generated feature expansions and optimizations applied"
+
+          # Push, but fail silently if no changes
           git push origin main || true
 
       - name: 🔍 Run AI Self-Testing Suite
