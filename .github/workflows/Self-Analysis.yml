@@ -58,6 +58,13 @@ jobs:
       - name: Run Self-Testing
         run: python3 -m unittest discover -s tests
 
+      - name: Push Changes If Modified
+        run: |
+          git config --global user.name "nyx-ai"
+          git config --global user.email "nyx@self-improving.ai"
+          git add src/nyx_core.py || true
+          git diff --quiet && git diff --staged --quiet || git commit -m "Automated self-improvement cycle"
+          git push origin main || true
       - name: Upload Modified Source Code
         uses: actions/upload-artifact@v4
         with:
