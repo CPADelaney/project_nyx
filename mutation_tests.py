@@ -6,6 +6,7 @@ import os
 
 ORIGINAL_FILE = "src/nyx_core.py"
 MODIFIED_FILE = "logs/nyx_core_modified.py"
+MODIFIED_FUNCTIONS = [f"logs/refactored_function_{i}.py" for i in range(10)]  # Adjust range as needed
 
 def compare_versions():
     """ Compare AI-modified code with original and log differences """
@@ -39,7 +40,27 @@ def test_modified_code():
         print("AI-modified code failed tests. Keeping original version.")
         return False
 
+def test_function_performance():
+    """ Benchmarks AI-modified functions against original ones """
+    for modified_function in MODIFIED_FUNCTIONS:
+        if not os.path.exists(modified_function):
+            continue
+
+        with open(modified_function, "r", encoding="utf-8") as file:
+            function_code = file.read()
+
+        # Execute AI-modified function and measure execution time
+        exec_globals = {}
+        exec(function_code, exec_globals)
+
+        test_function = [name for name in exec_globals if name.startswith("test_")]
+        if test_function:
+            function_name = test_function[0]
+            execution_time = timeit.timeit(f"{function_name}()", globals=exec_globals, number=100)
+            print(f"Execution time for {modified_function}: {execution_time} seconds")
+
 if __name__ == "__main__":
     compare_versions()
     if test_modified_code():
-        subprocess.run(["mv", MODIFIED_FILE, ORIGINAL_FILE])  # Replace old file with improved version
+        subprocess.run(["mv", MODIFIED_FILE, ORIGINAL_FILE]) 
+    test_function_performance()
