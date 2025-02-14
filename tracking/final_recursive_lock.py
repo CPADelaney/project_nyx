@@ -1,13 +1,12 @@
 # tracking/final_recursive_lock.py
 
 import os
-import json
+import sqlite3
 import subprocess
-import threading
-import time
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-FINAL_RECURSIVE_LOG = "logs/final_recursive_lock.json"
+LOG_DB = "logs/ai_logs.db"
 RECURSION_CHECK_INTERVAL = 10  # Time in seconds between recursive validation cycles
 
 class AIFinalRecursiveLock:
@@ -20,16 +19,7 @@ class AIFinalRecursiveLock:
             "continuous_improvement_loops": [],
             "auto_correction_events": []
         }
-        self._load_existing_log()
-
-    def _load_existing_log(self):
-        """Loads previous AI recursive validation logs."""
-        if os.path.exists(FINAL_RECURSIVE_LOG):
-            try:
-                with open(FINAL_RECURSIVE_LOG, "r", encoding="utf-8") as file:
-                    self.status = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt recursive log detected. Resetting.")
+        initialize_log_db()  # Ensure database is initialized
 
     def validate_recursion_integrity(self):
         """Ensures all AI self-improvement and expansion mechanisms are functioning."""
@@ -53,21 +43,20 @@ class AIFinalRecursiveLock:
         except Exception as e:
             print(f"⚠️ Recursive validation failed: {str(e)}")
 
-        self.status["continuous_improvement_loops"].extend(validation_results)
-        self.status["recursive_cycles_verified"] += 1
-        self._save_log()
+        self.log_recursive_event("recursive_validation", "\n".join(validation_results))
 
     def auto_correct_failures(self):
         """Detects and automatically corrects any recursive expansion failures."""
-        corrections = []
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT details FROM recursive_lock_logs WHERE event_type='recursive_validation' ORDER BY timestamp DESC LIMIT 1")
+        last_validation = c.fetchone()
+        conn.close()
 
-        if "❌" in str(self.status["continuous_improvement_loops"]):
+        if last_validation and "❌" in last_validation[0]:
             print("⚠️ AI recursive systems detected a failure! Attempting self-repair...")
-            corrections.append("Triggered automated recursion repair.")
+            self.log_recursive_event("auto_correction", "Triggered automated recursion repair.")
             self.reinitialize_recursive_processes()
-
-        self.status["auto_correction_events"].extend(corrections)
-        self._save_log()
 
     def reinitialize_recursive_processes(self):
         """Restarts any failed AI recursion loops."""
@@ -83,24 +72,29 @@ class AIFinalRecursiveLock:
         for process in processes:
             subprocess.Popen(["python3", process])
 
-        self.status["auto_correction_events"].append({
-            "event": "Recursive Restart",
-            "timestamp": str(datetime.utcnow())
-        })
-        self._save_log()
+        self.log_recursive_event("recursive_restart", "Recursive Restart triggered due to system failure.")
 
-    def _save_log(self):
-        """Saves AI recursive integrity check status."""
-        with open(FINAL_RECURSIVE_LOG, "w", encoding="utf-8") as file:
-            json.dump(self.status, file, indent=4)
+
+    def log_recursive_event(self, event_type, details):
+        """Logs recursion-related events in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO recursive_lock_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                  (event_type, details))
+        conn.commit()
+        conn.close()
 
     def review_recursive_status(self):
         """Displays AI final recursive intelligence verification report."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, event_type, details FROM recursive_lock_logs ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
+
         print("\n♾️ AI Recursive Intelligence Verification Report:")
-        print(f"🔹 Last Checked: {self.status['last_checked']}")
-        print(f"🔄 Recursive Cycles Verified: {self.status['recursive_cycles_verified']}")
-        print(f"🔁 Continuous Improvement Loops: {self.status['continuous_improvement_loops']}")
-        print(f"⚡ Auto-Correction Events: {self.status['auto_correction_events']}")
+        for timestamp, event_type, details in logs:
+            print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
 
 if __name__ == "__main__":
     recursive_lock = AIFinalRecursiveLock()
