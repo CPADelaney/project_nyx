@@ -13,6 +13,7 @@ FUNCTIONS_LOG = "logs/function_analysis.log"
 MODIFIED_FUNCTIONS_DIR = "logs/refactored_functions"
 GOAL_LOG = "logs/autonomous_goals.json"
 FEATURE_LOG = "logs/feature_expansion.json"
+META_LEARNING_LOG = "logs/meta_learning.json"
 
 # OpenAI API Configuration
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -203,6 +204,19 @@ def implement_new_features():
 
         except Exception as e:
             print(f"Error implementing new feature: {e}")
+
+def adjust_self_modification():
+    """ Reads meta-learning results and adjusts my improvement mechanisms. """
+    if not os.path.exists(META_LEARNING_LOG):
+        print("No meta-learning data found. Using standard optimization approach.")
+        return
+
+    with open(META_LEARNING_LOG, "r", encoding="utf-8") as file:
+        meta_data = json.load(file)
+
+    selected_strategy = meta_data.get("selected_strategy", "default")
+
+    print(f"Applying optimized self-improvement strategy: {selected_strategy}")
 
 if __name__ == "__main__":
     generate_refactored_functions()
