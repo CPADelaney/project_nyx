@@ -77,7 +77,7 @@ jobs:
       - name: Execute AI Agents for Recursive Improvement
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python3 src/multi_agent.py
+        run: python3 core/multi_agent.py
 
       - name: Push AI-Generated Features
         run: |
