@@ -1,5 +1,5 @@
 # tracking/self_preservation.py
-
+import sys
 import os
 import sqlite3
 import shutil
