@@ -10,7 +10,7 @@ CODE_DIR = "src"
 LOG_FILE = "logs/code_analysis.log"
 
 def analyze_code_structure(file_path):
-    """Analyzes the structure of a Python file."""
+    """Analyzes the structure of a Python file and extracts functions and imports."""
     with open(file_path, "r", encoding="utf-8") as file:
         tree = ast.parse(file.read(), filename=file_path)
     
@@ -34,7 +34,9 @@ def analyze_code_structure(file_path):
 
 def log_analysis(results):
     """Logs analysis results, ensuring the log file is never empty."""
-    with open(LOG_FILE, "a", encoding="utf-8") as log_file:
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)  # Ensure log directory exists
+
+    with open(LOG_FILE, "w", encoding="utf-8") as log_file:
         if not results:
             log_file.write("⚠️ No Python files found for analysis.\n")
             print("⚠️ Warning: No Python files detected. Log will be minimal.")
@@ -60,8 +62,12 @@ def main():
             results.append(analyze_code_structure(file_path))
 
     log_analysis(results)
+
+    # If no results were written, ensure log file still has meaningful output
+    with open(LOG_FILE, "a", encoding="utf-8") as log_file:
+        log_file.write("✅ Code analysis completed.\n")
+
     print(f"✅ Code analysis completed. Results logged in {LOG_FILE}")
 
 if __name__ == "__main__":
     main()
-
