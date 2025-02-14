@@ -1,6 +1,7 @@
 # src/multi_agent.py
 
 import sys
+from src.task_priority import load_task_priorities  # Ensure this is correctly imported
 import os
 
 # Ensure `src/` is in the Python path
@@ -11,7 +12,7 @@ import json
 import openai
 import subprocess
 
-AGENT_CONFIG = "src/agents.json"
+AGENT_CONFIG = "core/agents.json"
 ANALYSIS_LOG = "logs/code_analysis.log"
 
 DEFAULT_AGENTS = {
@@ -64,13 +65,27 @@ def assign_tasks(analysis_results):
 
     return tasks
 
+def decide_active_agents():
+    """Determines which AI agents should execute based on current priorities."""
+    priorities = load_task_priorities()
+
+    threshold = 6  # Minimum priority level required to run in this cycle
+    active_agents = {k: v for k, v in priorities.items() if v >= threshold}
+
+    if not active_agents:
+        print("⚠️ No high-priority agents needed this cycle. Skipping execution.")
+        return None  # ✅ Now it explicitly exits instead of running empty tasks
+
+    return active_agents
+
+
 def get_openai_client():
+    """Returns an OpenAI client instance."""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY not found in environment")
-    # You might just use openai, but if you want to keep a custom "OpenAI" usage, do so:
-    openai.api_key = api_key
-    return openai  # the standard openai module
+    
+    return openai.OpenAI(api_key=api_key)
 
 def generate_ai_response(task):
     """Uses OpenAI client to generate responses for each AI agent task."""
