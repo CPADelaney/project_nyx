@@ -24,9 +24,6 @@ jobs:
       - name: Install Dependencies
         run: pip install pylint
 
-      - name: Run Self-Analysis Script
-        run: python3 src/self_analysis.py
-
       - name: Ensure Log Directory Exists
         run: mkdir -p logs && touch logs/code_analysis.log
 
