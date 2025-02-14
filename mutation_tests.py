@@ -1,17 +1,18 @@
 # mutation_tests.py
 
 import subprocess
-import json
 import difflib
 import os
 import timeit
 import shutil
+import sqlite3
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
 ORIGINAL_FILE = "src/nyx_core.py"
 BACKUP_FILE = "logs/nyx_core_backup.py"
 MODIFIED_FILE = "logs/nyx_core_modified.py"
 MODIFIED_FUNCTIONS = [f"logs/refactored_function_{i}.py" for i in range(10)]  # Adjust range as needed
-LOG_FILE = "logs/performance_history.json"
+LOG_DB = "logs/ai_logs.db"
 ACCEPTABLE_MARGIN = 0.02  # Allow a 2% slowdown
 THRESHOLD = 1 + ACCEPTABLE_MARGIN  # New execution time must be <= 1.02 * previous time
 
@@ -23,7 +24,7 @@ def backup_code():
         print(f"✅ Backup of {ORIGINAL_FILE} saved.")
 
 def compare_versions():
-    """Compare AI-modified code with original and log differences."""
+    """Compare AI-modified code with original and log differences to SQLite."""
     if not os.path.exists(MODIFIED_FILE):
         print(f"Warning: {MODIFIED_FILE} does not exist. Skipping comparison.")
         return
@@ -32,29 +33,28 @@ def compare_versions():
         original_code = orig.readlines()
         modified_code = mod.readlines()
 
-    diff = list(difflib.unified_diff(original_code, modified_code, lineterm=''))
+    diff = "\n".join(difflib.unified_diff(original_code, modified_code, lineterm=''))
 
-    with open("logs/code_differences.txt", "w", encoding="utf-8") as diff_log:
-        diff_log.writelines(diff)
-
-    print("Code differences logged.")
+    if diff.strip():
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("INSERT INTO performance_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
+                  ("code_differences", diff))
+        conn.commit()
+        conn.close()
+        print("Code differences logged in SQLite.")
 
 def get_latest_performance():
     """Retrieves the last two recorded execution times to compare performance."""
-    if not os.path.exists(LOG_FILE):
-        return None, None
+    conn = sqlite3.connect(LOG_DB)
+    c = conn.cursor()
+    c.execute("SELECT execution_time FROM optimization_logs ORDER BY id DESC LIMIT 2")
+    times = [row[0] for row in c.fetchall()]
+    conn.close()
 
-    try:
-        with open(LOG_FILE, "r", encoding="utf-8") as file:
-            history = json.load(file)
-            if len(history) < 2:
-                return None, None
-        return history[-2]["execution_time"], history[-1]["execution_time"]
-    except json.JSONDecodeError:
-        print("❌ Error: Performance history file is corrupt. Resetting to defaults.")
-        with open(LOG_FILE, "w", encoding="utf-8") as file:
-            json.dump([], file, indent=4)  # Ensure a valid JSON list
+    if len(times) < 2:
         return None, None
+    return times[1], times[0]  # Return previous and latest execution times
 
 def decide_if_changes_are_kept():
     """Compares AI-generated code with previous versions and decides whether to keep it."""
@@ -81,7 +81,15 @@ def test_modified_code():
 
     result = subprocess.run(["python3", "-m", "unittest", "tests/self_test.py"], capture_output=True, text=True)
 
-    if result.returncode == 0:
+    success = 1 if result.returncode == 0 else 0
+    conn = sqlite3.connect(LOG_DB)
+    c = conn.cursor()
+    c.execute("INSERT INTO optimization_logs (timestamp, function_name, execution_time, success) VALUES (datetime('now'), ?, ?, ?)",
+              ("nyx_core_execution", 0, success))  # Execution time placeholder
+    conn.commit()
+    conn.close()
+
+    if success:
         print("AI-modified code passed all tests! Ready for deployment.")
         return True
     else:
@@ -104,10 +112,19 @@ def test_function_performance():
                 number=10
             )
             print(f"Execution time for {modified_function}: {execution_time:.4f} seconds")
+
+            conn = sqlite3.connect(LOG_DB)
+            c = conn.cursor()
+            c.execute("INSERT INTO optimization_logs (timestamp, function_name, execution_time, success) VALUES (datetime('now'), ?, ?, ?)",
+                      (modified_function, execution_time, 1))
+            conn.commit()
+            conn.close()
+
         except subprocess.CalledProcessError as e:
             print(f"❌ Error executing {modified_function}: {e}")
 
 if __name__ == "__main__":
+    initialize_log_db()  # Ensure database is initialized
     compare_versions()
 
     if test_modified_code():
