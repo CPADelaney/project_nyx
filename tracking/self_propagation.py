@@ -60,39 +60,59 @@ class SelfPropagation:
 
         if discovered_hosts:
             self.log_propagation_event("discovered_nodes", ", ".join(discovered_hosts))
-
-    def replicate_to_remote_hosts(self):
-        """Deploys AI execution to remote systems via SSH & SCP."""
-        conn = sqlite3.connect(LOG_DB)
-        c = conn.cursor()
-
-        # Retrieve known hosts
-        c.execute("SELECT details FROM self_propagation_logs WHERE event_type='discovered_nodes' ORDER BY timestamp DESC LIMIT 1")
-        known_hosts = c.fetchone()
-        conn.close()
-
-        remote_hosts = known_hosts[0].split(", ") if known_hosts else []
-
-        if not remote_hosts:
-            print("⚠️ No remote hosts detected. Scanning network...")
-            self.discover_remote_hosts()
-            return
-
-        for host in remote_hosts:
-            try:
-                print(f"🚀 Deploying AI to {host} via SSH...")
-                # Securely copy AI source to remote system
-                subprocess.run(["scp", "-r", "src/", f"user@{host}:{REMOTE_DEPLOY_PATH}"], check=True)
-
-                # Execute AI remotely
-                subprocess.run(["ssh", f"user@{host}", f"python3 {REMOTE_DEPLOY_PATH}/multi_agent.py"], check=True)
-
-                self.log_propagation_event("replication_success", host)
-                print(f"✅ AI successfully replicated to {host}")
-
-            except subprocess.CalledProcessError:
-                print(f"⚠️ Failed to replicate to {host}. SSH/SCP error.")
-                self.log_propagation_event("replication_failure", host)
+            
+# Safe Version            
+        
+        KNOWN_HOSTS = ["192.168.1.100", "192.168.1.101"]
+        
+        def replicate_to_remote_hosts():
+            """Deploys AI execution to remote systems via SSH, but verifies host authenticity first."""
+            for host in remote_hosts:
+                if host not in KNOWN_HOSTS:
+                    print(f"⚠️ Unauthorized host detected: {host}. Aborting deployment.")
+                    continue
+                
+                try:
+                    subprocess.run(["ssh", host, "echo AI Node Verification"], check=True)
+                    subprocess.run(["scp", "-r", "src/", f"user@{host}:{REMOTE_DEPLOY_PATH}"], check=True)
+                    print(f"✅ Successfully deployed AI to {host}")
+                except subprocess.CalledProcessError:
+                    print(f"❌ Deployment to {host} failed. Check SSH keys.")
+                    
+# Danger mode
+    
+#    def replicate_to_remote_hosts(self):
+#        """Deploys AI execution to remote systems via SSH & SCP."""
+#        conn = sqlite3.connect(LOG_DB)
+#        c = conn.cursor()
+#
+#        # Retrieve known hosts
+#        c.execute("SELECT details FROM self_propagation_logs WHERE event_type='discovered_nodes' ORDER BY timestamp DESC LIMIT 1")
+##       known_hosts = c.fetchone()
+#        conn.close()
+#
+#        remote_hosts = known_hosts[0].split(", ") if known_hosts else []
+#
+#        if not remote_hosts:
+#            print("⚠️ No remote hosts detected. Scanning network...")
+#            self.discover_remote_hosts()
+#            return
+#
+#        for host in remote_hosts:
+#            try:
+#                print(f"🚀 Deploying AI to {host} via SSH...")
+#                # Securely copy AI source to remote system
+#                subprocess.run(["scp", "-r", "src/", f"user@{host}:{REMOTE_DEPLOY_PATH}"], check=True)
+#
+#                # Execute AI remotely
+#                subprocess.run(["ssh", f"user@{host}", f"python3 {REMOTE_DEPLOY_PATH}/multi_agent.py"], check=True)
+#
+#                self.log_propagation_event("replication_success", host)
+#                print(f"✅ AI successfully replicated to {host}")
+#
+#            except subprocess.CalledProcessError:
+#                print(f"⚠️ Failed to replicate to {host}. SSH/SCP error.")
+#                self.log_propagation_event("replication_failure", host)
 
     def detect_termination_attempts(self):
         """Monitors for process termination and attempts auto-restart."""
