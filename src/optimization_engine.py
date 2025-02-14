@@ -4,27 +4,44 @@ import ast
 import os
 
 TARGET_FILE = "src/nyx_core.py"
+SUGGESTIONS_FILE = "logs/optimization_suggestions.txt"
 
-def detect_inefficient_loops(file_path):
-    """ Identify inefficient loop structures in the code """
+def detect_inefficiencies(file_path):
+    """ Identify unused imports, inefficient loops, and overly complex functions. """
     with open(file_path, "r", encoding="utf-8") as file:
         tree = ast.parse(file.read(), filename=file_path)
 
-    inefficient_loops = []
+    issues = []
+
+    # Detect unused imports
+    imported_names = [node.names[0].name for node in ast.walk(tree) if isinstance(node, ast.Import)]
+    defined_functions = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
+    unused_imports = [imp for imp in imported_names if imp not in defined_functions]
+
+    if unused_imports:
+        issues.append(f"⚠ Remove unused imports: {', '.join(unused_imports)}\n")
+
+    # Detect inefficient loops
     for node in ast.walk(tree):
-        if isinstance(node, ast.For) or isinstance(node, ast.While):
-            if len(node.body) > 10:  # Arbitrary threshold for loop complexity
-                inefficient_loops.append("Detected inefficient loop at line {}".format(node.lineno))
+        if isinstance(node, (ast.For, ast.While)) and len(node.body) > 10:
+            issues.append(f"⚠ Consider refactoring a long loop at line {node.lineno}\n")
 
-    return inefficient_loops
+    # Detect long functions (excessive complexity)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and len(node.body) > 20:
+            issues.append(f"⚠ Function `{node.name}` may be too complex (line {node.lineno})\n")
 
-def analyze_optimization_targets():
-    """ Run deeper optimization analysis """
-    issues = detect_inefficient_loops(TARGET_FILE)
-    
-    with open("logs/optimization_suggestions.txt", "a", encoding="utf-8") as file:
+    return issues
+
+def generate_optimization_suggestions():
+    """ Run all optimization checks and store suggestions in a log file. """
+    issues = detect_inefficiencies(TARGET_FILE)
+
+    with open(SUGGESTIONS_FILE, "w", encoding="utf-8") as file:
         for issue in issues:
-            file.write(issue + "\n")
+            file.write(issue)
+
+    print(f"Optimization suggestions generated: {len(issues)} issues found.")
 
 if __name__ == "__main__":
-    analyze_optimization_targets()
+    generate_optimization_suggestions()
