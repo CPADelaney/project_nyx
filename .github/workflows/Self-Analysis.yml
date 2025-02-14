@@ -124,6 +124,9 @@ jobs:
           git add src/generated_features/* || true
           git add logs/rollback_snapshots/* || true
 
+      - name: 🛠 Validate AI-Generated Code
+        run: python3 -m py_compile src/nyx_core.py || exit 1
+
       - name: 🔄 Commit AI-Generated Changes (If Any)
         run: |
           git config --global user.name "nyx-ai"
