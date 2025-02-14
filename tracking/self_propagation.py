@@ -6,6 +6,8 @@ import shutil
 import subprocess
 import socket
 from datetime import datetime
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
 LOG_DB = "logs/ai_logs.db"
