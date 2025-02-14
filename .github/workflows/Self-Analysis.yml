@@ -91,6 +91,9 @@ jobs:
       - name: 🔄 Maintain AI Execution Stability
         run: python3 tracking/self_execution.py
 
+      - name: 🌎 **Propagate AI to Additional Environments**
+        run: python3 tracking/self_propagation.py
+
       - name: ⚡ **Execute AI Agents (Parallelized)**
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
