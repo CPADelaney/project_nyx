@@ -1,5 +1,5 @@
 # tracking/performance_tracker.py
-
+import sys
 import os
 import sqlite3
 import subprocess
