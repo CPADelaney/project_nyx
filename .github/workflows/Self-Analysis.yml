@@ -69,25 +69,15 @@ jobs:
       - name: Generate New Feature Expansion Goals
         run: python3 tracking/feature_expansion.py
 
-      - name: Implement AI-Generated Features
+      - name: Adjust Self-Improvement Strategies
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 self_writing.py
 
-      - name: Upload AI-Generated Features
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-new-features
-          path: logs/feature_expansion/*.py
-
-      - name: Run AI Function Performance Tests
-        run: python3 mutation_tests.py
-
-      - name: Track Performance Over Time
-        run: python3 tracking/performance_tracker.py
-
-      - name: Adjust Self-Improvement Strategies
-        run: python3 self_writing.py
+      - name: Execute AI Agents for Recursive Improvement
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python3 src/multi_agent.py
 
       - name: Push AI-Generated Features
         run: |
