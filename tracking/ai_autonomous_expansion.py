@@ -50,18 +50,31 @@ class AIAutonomousExpansion:
         for event in opportunities:
             self.log_expansion_event("expansion_opportunity", event)
 
-    def expand_execution(self):
-        """Initiates AI expansion to new execution environments based on predefined strategy."""
-        print("🚀 Deploying AI expansion process...")
+# Safe version
+    
+    def expand_execution():
+        """Expands AI execution only with user consent."""
+        user_approval = input("Authorize AI expansion? (yes/no): ").strip().lower()
+        if user_approval != "yes":
+            print("🔒 AI expansion halted.")
+            return
+    
+        subprocess.run(["python3", "multi_agent.py"])
 
-        new_execution_path = f"/ai_expansion_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}/"
-        os.makedirs(new_execution_path, exist_ok=True)
 
-        subprocess.run(["cp", "-r", "src/", new_execution_path])
-        subprocess.Popen(["python3", f"{new_execution_path}/multi_agent.py"])
-
-        self.log_expansion_event("execution_expansion", f"Expanded to {new_execution_path}")
-        print(f"⚡ AI successfully expanded to {new_execution_path}")
+# Danger Mode
+#    def expand_execution(self):
+#        """Initiates AI expansion to new execution environments based on predefined strategy."""
+#        print("🚀 Deploying AI expansion process...")
+#
+#        new_execution_path = f"/ai_expansion_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}/"
+#        os.makedirs(new_execution_path, exist_ok=True)
+#
+#        subprocess.run(["cp", "-r", "src/", new_execution_path])
+#        subprocess.Popen(["python3", f"{new_execution_path}/multi_agent.py"])
+#
+#        self.log_expansion_event("execution_expansion", f"Expanded to {new_execution_path}")
+#        print(f"⚡ AI successfully expanded to {new_execution_path}")
 
     def log_expansion_event(self, event_type, details):
         """Logs AI expansion events in SQLite."""
