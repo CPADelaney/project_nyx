@@ -1,64 +1,57 @@
 # tracking/feature_expansion.py
 
 import os
-import json
+import sqlite3
 import subprocess
 from collections import Counter
 from datetime import datetime
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
-# File Paths
-PERFORMANCE_LOG = "logs/performance_history.json"
-GOAL_LOG = "logs/autonomous_goals.json"
-FEATURE_LOG = "logs/feature_expansion.json"
-MEMORY_LOG = "logs/ai_memory.json"
+LOG_DB = "logs/ai_logs.db"
+FEATURE_DIR = "src/generated_features/"
 
 class FeatureExpansion:
     """Handles AI memory tracking and new self-improvement feature generation."""
 
     def __init__(self):
-        self.short_term_memory = {}  # Stores active improvement ideas
-        self.long_term_memory = {}   # Stores finalized optimizations
+        initialize_log_db()  # Ensure database is initialized
+        self._initialize_database()
 
-        # Load memory from files if they exist
-        self._load_memory()
-
-    def _load_memory(self):
-        """Loads AI's thought memory from previous runs."""
-        if os.path.exists(MEMORY_LOG):
-            try:
-                with open(MEMORY_LOG, "r", encoding="utf-8") as file:
-                    memory_data = json.load(file)
-                    self.short_term_memory = memory_data.get("short_term", {})
-                    self.long_term_memory = memory_data.get("long_term", {})
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt memory log. Resetting memory.")
-
-    def _save_memory(self):
-        """Saves AI's thought memory for future sessions."""
-        memory_data = {
-            "short_term": self.short_term_memory,
-            "long_term": self.long_term_memory
-        }
-        with open(MEMORY_LOG, "w", encoding="utf-8") as file:
-            json.dump(memory_data, file, indent=4)
+    def _initialize_database(self):
+        """Ensures the feature expansion table exists in SQLite."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS feature_expansion (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                feature_name TEXT UNIQUE,
+                status TEXT,
+                last_updated TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
 
     def analyze_missing_capabilities(self):
         """Scans past improvements and identifies missing or underdeveloped features."""
-        if not os.path.exists(PERFORMANCE_LOG):
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+
+        # Retrieve slowest functions and missing capabilities
+        c.execute("SELECT details FROM performance_logs WHERE event_type='slow_function'")
+        slow_functions = [row[0] for row in c.fetchall()]
+
+        c.execute("SELECT details FROM performance_logs WHERE event_type='missing_capability'")
+        missing_capabilities = [row[0] for row in c.fetchall()]
+        conn.close()
+
+        if not slow_functions and not missing_capabilities:
             print("⚠️ No performance history found. Skipping feature expansion analysis.")
             return []
 
-        with open(PERFORMANCE_LOG, "r", encoding="utf-8") as file:
-            history = json.load(file)
-
-        recurring_issues = Counter()
-        for entry in history:
-            if "slowest_functions" in entry:
-                recurring_issues.update(entry["slowest_functions"])
-            if "missing_capabilities" in entry:
-                for feature in entry["missing_capabilities"]:
-                    recurring_issues[feature] += 1  # Track features Nyx has identified as needed
-
+        # Identify frequently occurring inefficiencies
+        recurring_issues = Counter(slow_functions + missing_capabilities)
         missing_features = [feature for feature, count in recurring_issues.items() if count > 2]  # More than 2 occurrences
 
         return missing_features
@@ -66,77 +59,84 @@ class FeatureExpansion:
     def generate_new_feature_goals(self):
         """Generates new AI-driven features based on persistent inefficiencies."""
         missing_features = self.analyze_missing_capabilities()
-    
-        # Ensure file exists, even if empty
-        if not missing_features:
-            with open(FEATURE_LOG, "w", encoding="utf-8") as file:
-                json.dump([], file, indent=4)
-            print("✅ No critical missing features detected. Empty feature log created.")
-            return
-    
-        new_goals = [{"goal": feature, "status": "pending"} for feature in missing_features]
-    
-        with open(FEATURE_LOG, "w", encoding="utf-8") as file:
-            json.dump(new_goals, file, indent=4)
-    
-        print(f"📌 Generated {len(new_goals)} new AI feature expansion goals.")
 
+        if not missing_features:
+            print("✅ No critical missing features detected. No feature expansion needed.")
+            return
+
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        for feature in missing_features:
+            c.execute("""
+                INSERT INTO feature_expansion (feature_name, status) 
+                VALUES (?, 'pending') 
+                ON CONFLICT(feature_name) DO NOTHING
+            """, (feature,))
+        conn.commit()
+        conn.close()
+
+        print(f"📌 Generated {len(missing_features)} new AI feature expansion goals.")
 
     def self_generate_feature_code(self):
         """Generates new AI functionality based on detected feature gaps."""
-        if not os.path.exists(FEATURE_LOG):
-            print("⚠️ No feature expansion goals found.")
-            return
-
-        with open(FEATURE_LOG, "r", encoding="utf-8") as file:
-            feature_goals = json.load(file)
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT feature_name FROM feature_expansion WHERE status='pending'")
+        feature_goals = c.fetchall()
+        conn.close()
 
         if not feature_goals:
             print("✅ No pending feature expansions.")
             return
 
         print("⚙️ Generating AI-driven feature implementations...")
-        for goal in feature_goals:
-            if goal["status"] == "pending":
-                feature_name = goal["goal"].replace("Develop ", "").replace(" to enhance AI efficiency.", "")
-                
-                # Generate AI code snippet for the new feature
-                ai_generated_code = f"""
+        os.makedirs(FEATURE_DIR, exist_ok=True)
+
+        for feature in feature_goals:
+            feature_name = feature[0].replace("Develop ", "").replace(" to enhance AI efficiency.", "")
+            feature_func = feature_name.replace(" ", "_").lower()
+
+            ai_generated_code = f"""
 # Auto-Generated Feature: {feature_name}
-def {feature_name.replace(' ', '_').lower()}():
-    \"\"\"This function implements {feature_name}, as identified by AI.\"\"\"
+def {feature_func}():
+    \"\"\"This function implements {feature_name}, as identified by AI.\"\"\"  
     pass
 """
 
-                # Write new feature to a dynamic module
-                feature_file = f"src/generated_features/{feature_name.replace(' ', '_').lower()}.py"
-                os.makedirs(os.path.dirname(feature_file), exist_ok=True)
-                with open(feature_file, "w", encoding="utf-8") as file:
-                    file.write(ai_generated_code)
+            # Write new feature to a dynamic module
+            feature_file = f"{FEATURE_DIR}{feature_func}.py"
+            with open(feature_file, "w", encoding="utf-8") as file:
+                file.write(ai_generated_code)
 
-                # Update goal status
-                goal["status"] = "in-progress"
-                goal["last_updated"] = str(datetime.utcnow())
+            # Update feature status in the database
+            conn = sqlite3.connect(LOG_DB)
+            c = conn.cursor()
+            c.execute("UPDATE feature_expansion SET status='in-progress', last_updated=datetime('now') WHERE feature_name=?", (feature[0],))
+            conn.commit()
+            conn.close()
 
-                print(f"🚀 AI-generated feature `{feature_name}` created at {feature_file}.")
-
-        # Save updated goals
-        with open(FEATURE_LOG, "w", encoding="utf-8") as file:
-            json.dump(feature_goals, file, indent=4)
+            print(f"🚀 AI-generated feature `{feature_name}` created at {feature_file}.")
 
     def finalize_thought(self, thought_id):
-        """Moves a completed AI-generated feature to long-term memory."""
-        if thought_id in self.short_term_memory:
-            self.long_term_memory[thought_id] = self.short_term_memory.pop(thought_id)
-            self._save_memory()
-            print(f"🔒 Thought {thought_id} finalized and archived.")
+        """Marks a completed AI-generated feature as finalized."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("UPDATE feature_expansion SET status='completed', last_updated=datetime('now') WHERE feature_name=?", (thought_id,))
+        conn.commit()
+        conn.close()
+        print(f"🔒 Thought `{thought_id}` finalized and archived.")
 
     def review_memory(self):
-        """Displays AI's current short-term and long-term thought memory."""
-        print("\n📖 AI Thought Memory Review:")
-        print("🔹 Short-Term Memory:", self.short_term_memory)
-        print("🔹 Long-Term Memory:", self.long_term_memory)
+        """Displays AI's current feature expansion status."""
+        conn = sqlite3.connect(LOG_DB)
+        c = conn.cursor()
+        c.execute("SELECT timestamp, feature_name, status FROM feature_expansion ORDER BY timestamp DESC")
+        logs = c.fetchall()
+        conn.close()
 
+        print("\n📖 AI Thought Memory Review:")
+        for timestamp, feature_name, status in logs:
+            print(f"🔹 {timestamp} | Feature: `{feature_name}` | Status: {status}")
 
 if __name__ == "__main__":
     feature_expansion = FeatureExpansion()
