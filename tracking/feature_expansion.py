@@ -66,23 +66,21 @@ class FeatureExpansion:
     def generate_new_feature_goals(self):
         """Generates new AI-driven features based on persistent inefficiencies."""
         missing_features = self.analyze_missing_capabilities()
-
+    
+        # Ensure file exists, even if empty
         if not missing_features:
-            print("✅ No critical missing features detected.")
+            with open(FEATURE_LOG, "w", encoding="utf-8") as file:
+                json.dump([], file, indent=4)
+            print("✅ No critical missing features detected. Empty feature log created.")
             return
-
-        new_goals = []
-        for feature in missing_features:
-            new_goals.append({
-                "goal": f"Develop {feature} to enhance AI efficiency.",
-                "status": "pending",
-                "last_updated": str(datetime.utcnow())
-            })
-
+    
+        new_goals = [{"goal": feature, "status": "pending"} for feature in missing_features]
+    
         with open(FEATURE_LOG, "w", encoding="utf-8") as file:
             json.dump(new_goals, file, indent=4)
-
+    
         print(f"📌 Generated {len(new_goals)} new AI feature expansion goals.")
+
 
     def self_generate_feature_code(self):
         """Generates new AI functionality based on detected feature gaps."""
