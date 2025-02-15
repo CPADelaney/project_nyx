@@ -27,20 +27,6 @@ class MetaLearning:
         self._load_meta_learning()
         initialize_log_db()  # Ensure the database is initialized
 
-    def _load_meta_learning(self):
-        """Loads past learning data from file."""
-        if os.path.exists(META_LEARNING_LOG):
-            try:
-                with open(META_LEARNING_LOG, "r", encoding="utf-8") as file:
-                    self.strategy_scores = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt meta-learning log. Resetting memory.")
-
-    def _save_meta_learning(self):
-        """Saves strategy success rates for future learning cycles."""
-        with open(META_LEARNING_LOG, "w", encoding="utf-8") as file:
-            json.dump(self.strategy_scores, file, indent=4)
-
     def analyze_self_improvement_patterns(self):
         """Scans past optimization cycles and assigns weighted success scores to strategies."""
         conn = sqlite3.connect(LOG_DB)
