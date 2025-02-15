@@ -79,9 +79,9 @@ class Personality:
         else:
             print(f"⚠️ Invalid personality trait: {trait}")
 
-    def get_personality(self):
-        """Returns the current personality traits."""
-        return self.load_personality()
+def get_personality(self):
+    """Returns the current personality traits."""
+    return self.load_personality()
 
 if __name__ == "__main__":
     ai_personality = Personality()
