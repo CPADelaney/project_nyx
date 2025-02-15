@@ -4,10 +4,8 @@ import os
 import sqlite3
 import random
 from collections import defaultdict
-from core.log_manager import initialize_log_db  # Ensure DB is initialized
-from core.personality import get_personality
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from core.log_manager import initialize_log_db  # Ensure DB is initialized
 from core.personality import get_personality
 
 # File paths
