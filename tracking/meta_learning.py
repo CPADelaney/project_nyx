@@ -117,8 +117,8 @@ class MetaLearning:
 
         return selected_strategy
 
-if __name__ == "__main__":
-    meta_learning = MetaLearning()
-    meta_learning.analyze_self_improvement_patterns()
-    best_strategy = meta_learning.refine_self_improvement()
-    print(f"🔬 Recommended self-improvement strategy: {best_strategy}")
+    def __init__(self):
+        # 🔥 REMOVE THIS LINE because `_load_meta_learning()` does not exist
+        # self._load_meta_learning()
+        initialize_log_db()  # Ensure the database is initialized
+        self.strategy_scores = defaultdict(lambda: {"success": 0, "failures": 0, "impact": 0})  # Multi-variable tracking
