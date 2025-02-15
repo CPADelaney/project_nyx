@@ -35,6 +35,18 @@ def initialize_log_db():
                     error_message TEXT
                  )''')
 
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS goals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+            goal TEXT,
+            target_function TEXT DEFAULT NULL,
+            priority TEXT CHECK(priority IN ('low', 'medium', 'high')) DEFAULT 'medium',
+            dependency TEXT DEFAULT NULL,
+            status TEXT CHECK(status IN ('pending', 'in-progress', 'completed', 'failed')) DEFAULT 'pending'
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
