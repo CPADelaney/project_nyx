@@ -15,10 +15,7 @@ class GoalGenerator:
     """Manages AI’s evolving self-improvement roadmap based on performance trends and autonomous expansion plans."""
 
     def __init__(self):
-        self.goals = []
-        self.evolution_plans = []
         initialize_log_db() 
-
 
     def analyze_trends(self):
         """Identifies recurring inefficiencies and predicts necessary improvements."""
