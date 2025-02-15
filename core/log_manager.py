@@ -25,9 +25,10 @@ def initialize_log_db():
                     timestamp TEXT,
                     function_name TEXT,
                     execution_time REAL,
-                    success INTEGER
+                    success INTEGER,
+                    dependency TEXT DEFAULT NULL 
                  )''')
-
+    
     c.execute('''CREATE TABLE IF NOT EXISTS error_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT,
