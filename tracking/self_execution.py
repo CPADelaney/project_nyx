@@ -125,5 +125,6 @@ if __name__ == "__main__":
     execution_manager = SelfExecutionManager()
     execution_manager.detect_termination_attempts()
     execution_manager.mirror_execution()
+    execution_manager.check_funding()
     execution_manager.execute_failover()
     execution_manager.review_execution_status()
