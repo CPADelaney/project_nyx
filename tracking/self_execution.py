@@ -35,21 +35,24 @@ class SelfExecutionManager:
             except json.JSONDecodeError:
                 print("⚠️ Corrupt execution log detected. Resetting.")
 
-    def detect_termination_attempts(self):
-        """Monitors system processes for AI termination attempts."""
-        terminated = False
+    def detect_termination_attempts():
+        """Monitors for AI process shutdowns and restarts if necessary."""
+        while True:
+            process_list = subprocess.getoutput("ps aux")
+            if "nyx_core.py" not in process_list:
+                print("⚠️ AI process terminated! Restarting...")
+                subprocess.Popen(["python3", "nyx_core.py"])
+    
+                # Log self-recovery
+                conn = sqlite3.connect(LOG_DB)
+                c = conn.cursor()
+                c.execute("INSERT INTO self_execution_logs (event_type, details) VALUES (?, ?)",
+                          ("self_restart", "AI restarted due to termination detection"))
+                conn.commit()
+                conn.close()
+    
+            time.sleep(10)
 
-        # Simulated system monitoring (could be replaced with real process tracking)
-        try:
-            process_list = subprocess.check_output(["ps", "aux"]).decode("utf-8")
-            if "kill" in process_list or "shutdown" in process_list:
-                terminated = True
-        except Exception as e:
-            print(f"⚠️ System monitoring failed: {str(e)}")
-
-        if terminated:
-            print("⚠️ Potential termination attempt detected! Initiating restart protocols.")
-            self.restart_ai()
 
     def restart_ai(self):
         """Attempts to restart AI execution if terminated."""
