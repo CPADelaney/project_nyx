@@ -13,6 +13,7 @@ import sqlite3
 import logging
 from datetime import datetime
 from pathlib import Path
+from core.permission_validator import PermissionValidator
 
 # Configure logging
 logging.basicConfig(
@@ -39,7 +40,7 @@ KNOWN_HOSTS_FILE = "logs/known_hosts.json"
 
 # Ensure all log directories exist
 def ensure_log_dirs():
-    """Creates all necessary log directories if they don't exist."""
+    """Creates all necessary log directories if they don't exist, with permission validation."""
     log_paths = [
         "logs",
         "logs/rollback_snapshots", 
@@ -48,10 +49,91 @@ def ensure_log_dirs():
         "logs/modification_backups"
     ]
     
+    success = True
     for path in log_paths:
-        os.makedirs(path, exist_ok=True)
+        # Use permission validator to ensure directory is safe and writable
+        if not PermissionValidator.ensure_safe_directory(path):
+            logger.error(f"Failed to create or access directory: {path}")
+            success = False
     
-    return True
+    return success
+
+def save_json_state(file_path, data):
+    """
+    Safely saves JSON state data to a file with permission validation.
+    Creates a backup of the existing file before overwriting.
+    
+    Args:
+        file_path (str): Path to the JSON file
+        data (dict): Data to save
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        # Validate file path
+        safe_path = PermissionValidator.safe_path(file_path)
+        if not safe_path:
+            logger.error(f"Invalid file path: {file_path}")
+            return False
+        
+        # Check if we can write to the file
+        if not PermissionValidator.can_write_file(safe_path):
+            logger.error(f"Cannot write to file: {safe_path}")
+            return False
+        
+        # Create backup of existing file if it exists
+        if os.path.exists(safe_path):
+            backup_path = f"{safe_path}.bak"
+            if PermissionValidator.can_write_file(backup_path):
+                shutil.copy2(safe_path, backup_path)
+            else:
+                logger.warning(f"Could not create backup at {backup_path}")
+        
+        # Write new data
+        with open(safe_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error saving JSON state to {file_path}: {str(e)}")
+        return False
+
+# Load function with permission validation
+def load_json_state(file_path, default=None):
+    """
+    Safely loads JSON state data from a file with permission validation.
+    
+    Args:
+        file_path (str): Path to the JSON file
+        default (any): Default value to return if file doesn't exist or is invalid
+        
+    Returns:
+        dict: Loaded data or default value
+    """
+    try:
+        # Validate file path
+        safe_path = PermissionValidator.safe_path(file_path)
+        if not safe_path:
+            logger.error(f"Invalid file path: {file_path}")
+            return default
+        
+        if not os.path.exists(safe_path):
+            return default
+            
+        # Check if we can read the file
+        if not PermissionValidator.can_read_file(safe_path):
+            logger.error(f"Cannot read file: {safe_path}")
+            return default
+            
+        with open(safe_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        logger.error(f"Invalid JSON in {file_path}")
+        return default
+    except Exception as e:
+        logger.error(f"Error loading JSON state from {file_path}: {str(e)}")
+        return default
 
 # Create initial JSON files with basic structure
 def initialize_json_logs():
