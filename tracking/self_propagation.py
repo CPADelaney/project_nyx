@@ -202,3 +202,5 @@ if __name__ == "__main__":
     propagation_manager.detect_termination_attempts()
     propagation_manager.replicate_to_remote_hosts()
     propagation_manager.review_propagation_status()
+    propogation_manager.deploy_to_ipfs()
+    propogation_manager.deploy_to_decentralized_gpu()
