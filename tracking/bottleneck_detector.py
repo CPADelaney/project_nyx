@@ -5,17 +5,29 @@ import pstats
 import os
 import sqlite3
 from io import StringIO
+from core.secure_subprocess import run
+
+logger = logging.getLogger("NYX-BottleneckDetector")
 
 LOG_DB = "logs/ai_logs.db"
 TARGET_FILE = "src/nyx_core.py"
 THRESHOLD_PERCENT = 5  # Only optimize if function runs 5% slower than baseline
+
 
 def profile_execution():
     """Runs profiling on nyx_core.py and logs function execution times."""
     profiler = cProfile.Profile()
     profiler.enable()
 
-    os.system(f"python3 {TARGET_FILE}")  # Run the AI core
+    try:
+        # Use secure subprocess to run nyx_core.py
+        result = run(["python3", TARGET_FILE], capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.warning(f"nyx_core.py execution failed: {result.stderr}")
+            return False
+    except Exception as e:
+        logger.error(f"Error executing nyx_core.py: {str(e)}")
+        return False
 
     profiler.disable()
     result = StringIO()
@@ -40,7 +52,9 @@ def profile_execution():
         c.execute("INSERT INTO optimization_logs (function_name, execution_time) VALUES (?, ?)", (func, time))
     conn.commit()
     conn.close()
-
+    
+    return True
+    
 def detect_bottlenecks():
     """Identifies the slowest functions based on profiling history."""
     conn = sqlite3.connect(LOG_DB)
@@ -60,5 +74,9 @@ def detect_bottlenecks():
     return [func for func, max_time, min_time in slow_functions]
 
 if __name__ == "__main__":
-    profile_execution()
-    print("🔍 Bottlenecks detected:", detect_bottlenecks())
+    logging.basicConfig(level=logging.INFO)
+    if profile_execution():
+        bottlenecks = detect_bottlenecks()
+        logger.info(f"🔍 Bottlenecks detected: {bottlenecks}")
+    else:
+        logger.error("Failed to profile execution")
