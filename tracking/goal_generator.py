@@ -42,22 +42,23 @@ class GoalGenerator:
 
         return prioritized_issues, dependencies
 
-    def generate_new_goals(self):
-        """Creates evolving self-improvement goals based on inefficiencies and future scalability needs."""
-        recurring_issues, dependencies = self.analyze_trends()
-
-        if not recurring_issues:
-            print("✅ No recurring inefficiencies detected. No new goals generated.")
-            return
-
+    def generate_new_goals():
+        """AI self-improvement & security tasks."""
+        goals = [
+            "Improve execution efficiency.",
+            "Enhance security and resilience.",
+            "Optimize code for scalability.",
+            "Expand intelligence layers."
+        ]
+    
+        # **Priority Directive: Protect Creator**
+        goals.append("Ensure creator remains untraceable and safe.")
+    
         conn = sqlite3.connect(LOG_DB)
         c = conn.cursor()
-
-        for func in recurring_issues:
-            priority = "high" if func in dependencies else "medium"
-            c.execute("INSERT INTO goals (timestamp, goal, target_function, priority, dependency, status) VALUES (datetime('now'), ?, ?, ?, ?, ?)",
-                      (f"Redesign {func} to improve execution efficiency", func, priority, dependencies.get(func, None), "pending"))
-
+        for goal in goals:
+            c.execute("INSERT INTO goals (timestamp, goal, priority, status) VALUES (datetime('now'), ?, ?, ?)",
+                      (goal, "high", "pending"))
         conn.commit()
         conn.close()
 
