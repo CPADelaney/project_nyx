@@ -9,6 +9,12 @@ CODE_DIR = "src"
 # Log file for self-analysis
 LOG_FILE = "logs/code_analysis.log"
 
+past_memories = recall_memory()
+if past_memories:
+    print("🔄 Restoring AI memory...")
+    for memory in past_memories:
+        print(f"📌 Past Event: {memory}")
+
 def analyze_code_structure(file_path):
     """Analyzes the structure of a Python file and extracts functions and imports."""
     try:
