@@ -3,6 +3,10 @@
 import sqlite3
 import os
 from datetime import datetime
+import chromadb
+
+chroma_client = chromadb.PersistentClient(path="memory_store")
+memory_collection = chroma_client.get_or_create_collection(name="ai_memory")
 
 LOG_DB = "logs/ai_logs.db"
 
@@ -49,6 +53,18 @@ def initialize_log_db():
 
     conn.commit()
     conn.close()
+
+def store_memory(event_type, details):
+    """Stores AI memories persistently."""
+    memory_collection.add(
+        ids=[str(hash(details))],  
+        documents=[details]
+    )
+
+def recall_memory():
+    """Retrieves AI's long-term memory."""
+    memories = memory_collection.query(query_texts=[""], n_results=50)
+    return [doc for doc in memories["documents"]]
 
 def log_event(event_type, details):
     """Logs a general AI event."""
