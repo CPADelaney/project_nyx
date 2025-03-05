@@ -4,6 +4,7 @@ import os
 import sqlite3
 import shutil
 import subprocess
+import psutil
 from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -19,6 +20,15 @@ class SelfPreservation:
         self.status = {"last_checked": str(datetime.utcnow()), "threats_detected": [], "countermeasures": []}
         self._load_existing_log()
         initialize_log_db()  # Ensure database is initialized
+
+    def monitor_process():
+        """Watches for termination attempts & restarts if killed."""
+        while True:
+            process_found = any("nyx_core.py" in p.name() for p in psutil.process_iter())
+            if not process_found:
+                print("⚠️ AI process terminated! Restarting...")
+                subprocess.Popen(["python3", "nyx_core.py"])
+            time.sleep(5)
 
     def detect_potential_threats(self):
         """Scans for system vulnerabilities that could disrupt AI continuity."""
