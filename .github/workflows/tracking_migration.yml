@@ -54,10 +54,6 @@ jobs:
           mkdir -p scripts
           cat > scripts/tracking_import_scanner.py << 'EOF'
 #!/usr/bin/env python3
-"""
-Script to scan for old tracking module imports and optionally update them.
-This can be run directly or as part of a GitHub Action.
-"""
 
 import os
 import re
