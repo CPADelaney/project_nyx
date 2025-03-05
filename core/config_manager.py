@@ -79,6 +79,20 @@ DEFAULT_CONFIG = {
         "openai_enabled": False,          # Default to False until key is provided
         "max_token_usage": 1000
     }
+
+    "monitoring": {
+        "enabled": True,
+        "resource_interval": 60,     # Seconds between resource checks
+        "component_interval": 120,   # Seconds between component checks
+        "performance_interval": 300, # Seconds between performance checks
+        "log_retention_days": 7,     # Days to keep monitoring logs
+        "alert_thresholds": {
+            "cpu_percent": 80,       # Alert if CPU exceeds 80%
+            "memory_percent": 80,    # Alert if memory exceeds 80%
+            "disk_percent": 90,      # Alert if disk exceeds 90%
+            "error_rate": 10         # Alert if more than 10 errors per day
+        }
+    }
 }
 
 # Path to user configuration
