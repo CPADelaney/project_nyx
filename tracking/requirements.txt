@@ -1,7 +1,39 @@
-pylint
-ast
-unittest
-black
-isort
-autopep8
-openai
+# requirements.txt
+
+# Core dependencies
+numpy>=1.20.0
+pandas>=1.2.0
+matplotlib>=3.3.0
+SQLite3>=3.35.0
+psutil>=5.8.0
+
+# AI and ML dependencies
+scikit-learn>=0.24.0
+torch>=1.8.0
+networkx>=2.5.0
+chromadb>=0.4.0
+
+# Web and data processing
+requests>=2.25.0
+beautifulsoup4>=4.9.0
+paramiko>=2.7.0
+
+# Code analysis and optimization
+pylint>=2.8.0
+black>=21.5b0
+isort>=5.9.0
+autopep8>=1.5.7
+
+# Testing
+pytest>=6.2.0
+pytest-cov>=2.12.0
+
+# Optional: OpenAI integration (if using)
+openai>=0.27.0
+
+# Optional: Symbolic reasoning
+z3-solver>=4.8.0
+
+# Verification and monitoring
+jsonschema>=3.2.0
+tqdm>=4.61.0
