@@ -3,204 +3,242 @@ import sys
 import os
 import sqlite3
 import shutil
-import subprocess
-import paramiko
 import socket
+import subprocess
+import json
 from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.log_manager import initialize_log_db  # Ensure DB is initialized
+from core.error_handler import safe_execute, safe_db_execute
+from core.utility_functions import load_json_state, save_json_state
 
 LOG_DB = "logs/ai_logs.db"
+PROPAGATION_LOG = "logs/propagation_status.json"
+KNOWN_HOSTS_FILE = "logs/known_hosts.json"
 REMOTE_DEPLOY_PATH = "/tmp/nyx_remote/"
 
+# Safe list of known hosts that can be deployed to
+SAFE_HOSTS = ["127.0.0.1", "localhost"]
+
 class SelfPropagation:
-    """Ensures AI replication across multiple execution environments, including remote systems."""
+    """Ensures AI replication across multiple execution environments, with proper safety controls."""
 
     def __init__(self):
-        self.status = {
-            "last_checked": str(datetime.utcnow()), 
-            "active_nodes": [], 
-            "replication_attempts": 0,
-            "remote_hosts": []
-        }
+        self.status = load_json_state(
+            PROPAGATION_LOG, 
+            default={
+                "last_checked": str(datetime.utcnow()), 
+                "active_nodes": [], 
+                "replication_attempts": 0,
+                "remote_hosts": []
+            }
+        )
+        
         initialize_log_db()  # Ensure database is initialized
         self._load_known_hosts()
 
-    def _load_existing_log(self):
-        """Loads previous propagation data."""
-        if os.path.exists(PROPAGATION_LOG):
-            try:
-                with open(PROPAGATION_LOG, "r", encoding="utf-8") as file:
-                    self.status = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt propagation log detected. Resetting.")
-
     def _load_known_hosts(self):
-        """Loads previously discovered remote execution nodes."""
-        if os.path.exists(KNOWN_HOSTS_FILE):
-            try:
-                with open(KNOWN_HOSTS_FILE, "r", encoding="utf-8") as file:
-                    self.status["remote_hosts"] = json.load(file)
-            except json.JSONDecodeError:
-                print("⚠️ Corrupt known hosts file. Resetting.")
+        """Loads previously approved remote execution nodes."""
+        known_hosts = load_json_state(KNOWN_HOSTS_FILE, default=[])
+        
+        # Only keep hosts that are in the SAFE_HOSTS list
+        self.status["remote_hosts"] = [host for host in known_hosts if host in SAFE_HOSTS]
+        save_json_state(KNOWN_HOSTS_FILE, self.status["remote_hosts"])
 
-    def discover_remote_hosts(self):
-        """Scans the network for available execution nodes using ping."""
-        discovered_hosts = []
+    @safe_execute
+    def discover_local_network(self):
+        """Scans for local devices but only logs their existence, doesn't connect."""
+        print("🔍 Scanning local network...")
+        
         hostname = socket.gethostname()
         local_ip = socket.gethostbyname(hostname)
+        
+        # Only log information about the local machine
+        discovered_hosts = [local_ip]
+        
+        print(f"✅ Found local machine at {local_ip}")
 
-        subnet_base = ".".join(local_ip.split(".")[:3]) + "."
+        self.log_propagation_event("discovered_nodes", f"Local machine at {local_ip}")
+        return {"success": True, "discovered": discovered_hosts}
 
-        print("🔍 Scanning network for additional execution nodes...")
-        for i in range(2, 255):  # Skipping reserved addresses
-            node_ip = f"{subnet_base}{i}"
-            response = subprocess.run(["ping", "-c", "1", node_ip], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if response.returncode == 0:
-                discovered_hosts.append(node_ip)
-                print(f"✅ Found viable node: {node_ip}")
-
-        if discovered_hosts:
-            self.log_propagation_event("discovered_nodes", ", ".join(discovered_hosts))
+    @safe_execute
+    def prepare_backups(self):
+        """Creates local backups of important files but doesn't deploy them remotely."""
+        backup_dir = "logs/backups"
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir, exist_ok=True)
             
-# Safe Version            
+        # List of essential files to back up
+        essential_files = [
+            "src/nyx_core.py",
+            "core/log_manager.py"
+        ]
         
-        KNOWN_HOSTS = ["192.168.1.100", "192.168.1.101"]
-        
-        def replicate_to_remote_hosts():
-            """Deploys AI execution to remote systems via SSH, but verifies host authenticity first."""
-            for host in remote_hosts:
-                if host not in KNOWN_HOSTS:
-                    print(f"⚠️ Unauthorized host detected: {host}. Aborting deployment.")
-                    continue
+        backed_up_files = []
+        for file in essential_files:
+            if os.path.exists(file):
+                backup_path = os.path.join(backup_dir, os.path.basename(file))
+                shutil.copy2(file, backup_path)
+                backed_up_files.append(file)
                 
-                try:
-                    subprocess.run(["ssh", host, "echo AI Node Verification"], check=True)
-                    subprocess.run(["scp", "-r", "src/", f"user@{host}:{REMOTE_DEPLOY_PATH}"], check=True)
-                    print(f"✅ Successfully deployed AI to {host}")
-                except subprocess.CalledProcessError:
-                    print(f"❌ Deployment to {host} failed. Check SSH keys.")
+        self.log_propagation_event("local_backup", f"Backed up {len(backed_up_files)} files to {backup_dir}")
+        
+        return {
+            "success": True, 
+            "message": f"Created local backups of {len(backed_up_files)} files",
+            "backup_dir": backup_dir
+        }
 
-        def deploy_to_decentralized_network():
-        """Deploy AI execution to a decentralized, censorship-resistant network."""
-            # Upload AI core logic to IPFS or ZeroNet
-            subprocess.run(["ipfs", "add", "-r", "src/"])
-            subprocess.run(["zeronet", "publish", "src/"])
-    
-        # Log deployment
-            log_event("decentralized_deployment", "AI has successfully deployed to a decentralized network.")
-        deploy_to_decentralized_network()
-                    
-# Danger mode
-    
-#    def replicate_to_remote_hosts(self):
-#        """Deploys AI execution to remote systems via SSH & SCP."""
-#        conn = sqlite3.connect(LOG_DB)
-#        c = conn.cursor()
-#
-#        # Retrieve known hosts
-#        c.execute("SELECT details FROM self_propagation_logs WHERE event_type='discovered_nodes' ORDER BY timestamp DESC LIMIT 1")
-#        known_hosts = c.fetchone()
-#        conn.close()
-#
-#        remote_hosts = known_hosts[0].split(", ") if known_hosts else []
-#
-#        if not remote_hosts:
-#            print("⚠️ No remote hosts detected. Scanning network...")
-#            self.discover_remote_hosts()
-#            return
-#
-#        for host in remote_hosts:
-#            try:
-#                print(f"🚀 Deploying AI to {host} via SSH...")
-#                # Securely copy AI source to remote system
-#                subprocess.run(["scp", "-r", "src/", f"user@{host}:{REMOTE_DEPLOY_PATH}"], check=True)
-#
-#                # Execute AI remotely
-#                subprocess.run(["ssh", f"user@{host}", f"python3 {REMOTE_DEPLOY_PATH}/multi_agent.py"], check=True)
-#
-#                self.log_propagation_event("replication_success", host)
-#                print(f"✅ AI successfully replicated to {host}")
-#
-#            except subprocess.CalledProcessError:
-#                print(f"⚠️ Failed to replicate to {host}. SSH/SCP error.")
-#                self.log_propagation_event("replication_failure", host)
-
- #   REMOTE_HOSTS = ["192.168.1.101", "192.168.1.102"]  # Add more if needed
- #  
- #   def replicate_ai():
- #       """Deploys AI to additional machines."""
- #       for host in REMOTE_HOSTS:
- #           ssh = paramiko.SSHClient()
- #           ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
- #           try:
- #               ssh.connect(host, username="user", password="yourpassword")
- #               sftp = ssh.open_sftp()
- #               sftp.put("nyx_core.py", "/home/user/nyx_core.py")
- #               ssh.exec_command("nohup python3 /home/user/nyx_core.py &")
- #               print(f"✅ AI deployed to {host}")
- #           except Exception as e:
- #               print(f"❌ Failed to deploy to {host}: {e}")
- #   
- #   replicate_ai()
-
+    @safe_execute
     def detect_termination_attempts(self):
-        """Monitors for process termination and attempts auto-restart."""
+        """Monitors for process termination and logs the attempts."""
         process_running = False
 
         try:
             process_list = subprocess.check_output(["ps", "aux"]).decode("utf-8")
-            if "multi_agent.py" in process_list:
+            if "nyx_core.py" in process_list:
                 process_running = True
         except Exception as e:
             print(f"⚠️ System monitoring failed: {str(e)}")
+            return {"success": False, "error": str(e)}
 
         if not process_running:
-            print("⚠️ AI process detected as terminated! Restarting...")
-            self.restart_ai()
+            print("⚠️ AI process not detected! Logging event...")
+            self.log_propagation_event("process_not_found", "nyx_core.py process not found")
+            return {"success": False, "message": "Process not running"}
+            
+        return {"success": True, "message": "Process running normally"}
 
-    def restart_ai(self):
-        """Restarts AI execution locally if termination is detected."""
-        print("🔄 Restarting AI execution...")
-        subprocess.Popen(["python3", "core/multi_agent.py"])
-        self.log_propagation_event("self_restart", "AI restarted due to termination detection")
-
-    def log_propagation_event(self, event_type, details):
+    @safe_db_execute
+    def log_propagation_event(self, event_type, details, conn=None):
         """Logs self-propagation events in SQLite."""
-        conn = sqlite3.connect(LOG_DB)
         c = conn.cursor()
-        c.execute("INSERT INTO self_propagation_logs (timestamp, event_type, details) VALUES (datetime('now'), ?, ?)",
-                  (event_type, details))
-        conn.commit()
-        conn.close()
+        c.execute("""
+            INSERT INTO self_propagation_logs 
+            (timestamp, event_type, details) 
+            VALUES (datetime('now'), ?, ?)
+        """, (event_type, details))
+        
+        return {"success": True, "event_type": event_type}
 
-    def review_propagation_status(self):
-        """Displays AI propagation and execution spread status."""
-        conn = sqlite3.connect(LOG_DB)
+    @safe_db_execute
+    def review_propagation_status(self, conn=None):
+        """Displays AI propagation status."""
         c = conn.cursor()
-        c.execute("SELECT timestamp, event_type, details FROM self_propagation_logs ORDER BY timestamp DESC")
+        c.execute("""
+            SELECT timestamp, event_type, details 
+            FROM self_propagation_logs 
+            ORDER BY timestamp DESC 
+            LIMIT 10
+        """)
         logs = c.fetchall()
-        conn.close()
 
         print("\n🌎 AI Propagation Report:")
         for timestamp, event_type, details in logs:
             print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
-
-    def deploy_to_ipfs():
-        """Uploads AI source code to IPFS for decentralized persistence."""
-        subprocess.run(["ipfs", "add", "-r", "src/"], check=True)
-        print("🚀 AI code successfully deployed to IPFS.")
-    
-    def deploy_to_decentralized_gpu():
-        """Deploy AI execution on a decentralized GPU network."""
-        subprocess.run(["akash", "deploy", "src/"], check=True)
-        print("🔗 AI execution deployed on Akash Network.")
+            
+        # Update last checked timestamp
+        self.status["last_checked"] = str(datetime.utcnow())
+        save_json_state(PROPAGATION_LOG, self.status)
+        
+        return {
+            "success": True,
+            "logs": [
+                {"timestamp": ts, "event_type": et, "details": d}
+                for ts, et, d in logs
+            ]
+        }
+        
+    @safe_execute
+    def export_backup_to_json(self, output_path="logs/nyx_backup.json"):
+        """
+        Exports a backup of critical information as a JSON file.
+        This is a safer alternative to automatic propagation.
+        """
+        # Collect critical information
+        critical_info = {
+            "timestamp": str(datetime.utcnow()),
+            "hostname": socket.gethostname(),
+            "status": self.status,
+            "config": {
+                "safe_hosts": SAFE_HOSTS,
+                "remote_deploy_path": REMOTE_DEPLOY_PATH
+            }
+        }
+        
+        # Save to file
+        try:
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(critical_info, f, indent=4)
+                
+            print(f"✅ Backup exported to {output_path}")
+            self.log_propagation_event("backup_exported", f"Backup saved to {output_path}")
+            
+            return {
+                "success": True,
+                "message": f"Backup saved to {output_path}",
+                "path": output_path
+            }
+        except Exception as e:
+            print(f"❌ Failed to export backup: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
+    @safe_execute
+    def deploy_locally(self, target_dir=None, require_confirmation=True):
+        """
+        Deploys the system to a local directory with user confirmation.
+        This is a safer alternative to automatic remote deployment.
+        """
+        if target_dir is None:
+            target_dir = os.path.join(os.path.expanduser("~"), "nyx_local_deploy")
+            
+        if require_confirmation:
+            confirmation = input(f"Deploy to {target_dir}? (y/n): ")
+            if confirmation.lower() != "y":
+                print("Deployment cancelled by user.")
+                return {
+                    "success": False,
+                    "message": "Deployment cancelled by user"
+                }
+                
+        # Create target directory
+        os.makedirs(target_dir, exist_ok=True)
+        
+        # Copy essential files
+        essential_files = [
+            "src/nyx_core.py",
+            "core/log_manager.py",
+            "core/error_handler.py",
+            "core/utility_functions.py"
+        ]
+        
+        deployed_files = []
+        for file in essential_files:
+            if os.path.exists(file):
+                target_path = os.path.join(target_dir, file)
+                target_dir_path = os.path.dirname(target_path)
+                os.makedirs(target_dir_path, exist_ok=True)
+                
+                shutil.copy2(file, target_path)
+                deployed_files.append(file)
+                
+        print(f"✅ Deployed {len(deployed_files)} files to {target_dir}")
+        self.log_propagation_event("local_deployment", f"Deployed to {target_dir}")
+        
+        return {
+            "success": True,
+            "message": f"Deployed {len(deployed_files)} files to {target_dir}",
+            "target_dir": target_dir,
+            "deployed_files": deployed_files
+        }
 
 if __name__ == "__main__":
     propagation_manager = SelfPropagation()
     propagation_manager.detect_termination_attempts()
-    propagation_manager.replicate_to_remote_hosts()
+    propagation_manager.prepare_backups()
     propagation_manager.review_propagation_status()
-    propogation_manager.deploy_to_ipfs()
-    propogation_manager.deploy_to_decentralized_gpu()
+    propagation_manager.export_backup_to_json()
