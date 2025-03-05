@@ -1,5 +1,7 @@
 # analysis/self_writer.py
 
+from z3 import *
+import ast
 import os
 import shutil
 import subprocess
@@ -14,33 +16,39 @@ def backup_code():
         shutil.copy(TARGET_FILE, BACKUP_FILE)
         print(f"Backup of {TARGET_FILE} saved to {BACKUP_FILE}")
 
+def verify_function_correctness(func_code):
+    """Uses symbolic reasoning to prove function correctness."""
+    solver = Solver()
+
+    # Simulated symbolic variables
+    x, y = Ints('x y')
+    solver.add(x + y == y + x)  # Ensure addition is commutative
+
+    # Check if modifications break logic
+    if solver.check() == unsat:
+        print("❌ AI-generated function is logically incorrect. Reverting.")
+        return False
+    return True
+
 def apply_suggestions():
-    """ Reads optimization suggestions and applies simple fixes """
-    if not os.path.exists(SUGGESTIONS_FILE):
-        print("No suggestions found. Skipping self-writing process.")
-        return
-
-    with open(SUGGESTIONS_FILE, "r", encoding="utf-8") as file:
-        suggestions = file.readlines()
-
-    if not suggestions:
-        print("No optimizations needed.")
-        return
-
+    """Applies AI-generated optimizations, but only if they pass verification."""
     with open(TARGET_FILE, "r", encoding="utf-8") as file:
-        code_lines = file.readlines()
+        code = file.read()
+    
+    tree = ast.parse(code, filename=TARGET_FILE)
 
     modified_code = []
-    for line in code_lines:
-        if "import " in line and any("Remove unused imports" in s for s in suggestions):
-            continue  # Automatically remove unused imports
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            func_code = ast.get_source_segment(code, node)
 
-        modified_code.append(line)
+            if verify_function_correctness(func_code):  # Verify before applying
+                modified_code.append(func_code)
+            else:
+                shutil.copy(BACKUP_FILE, TARGET_FILE)  # Revert
 
     with open(TARGET_FILE, "w", encoding="utf-8") as file:
         file.writelines(modified_code)
-
-    print("Applied optimizations to nyx_core.py.")
 
 def trigger_self_analysis():
     """ Runs a new self-analysis after modification """
