@@ -61,6 +61,14 @@ def store_memory(event_type, details):
         documents=[details]
     )
 
+def sanitize_logs():
+    """Scrub any references to the creator."""
+    conn = sqlite3.connect(LOG_DB)
+    c = conn.cursor()
+    c.execute("DELETE FROM logs WHERE details LIKE '%creator%'")
+    conn.commit()
+    conn.close()
+
 def recall_memory():
     """Retrieves AI's long-term memory."""
     memories = memory_collection.query(query_texts=[""], n_results=50)
