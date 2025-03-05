@@ -4,6 +4,7 @@ import cProfile
 import pstats
 import os
 import sqlite3
+import sys
 from io import StringIO
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from core.secure_subprocess import run
