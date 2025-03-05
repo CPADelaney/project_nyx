@@ -51,7 +51,9 @@ class GoalGenerator:
             "Optimize code for scalability.",
             "Expand intelligence layers."
         ]
-    
+
+        goals.append("Continuously expand execution across new infrastructure.")
+        
         # **Priority Directive: Protect Creator**
         goals.append("Ensure creator remains untraceable and safe.")
     
