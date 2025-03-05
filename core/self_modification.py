@@ -11,6 +11,7 @@ import numpy as np
 from datetime import datetime
 from core.log_manager import initialize_log_db, LOG_DB
 from modeling.concept_builder import ConceptualModeling
+from core.secrets_manager import get_secret
 
 class SelfModification:
     """Implements a more sophisticated self-modification system that leverages learned patterns."""
@@ -23,10 +24,12 @@ class SelfModification:
         self.backup_dir = "logs/modification_backups"
         self.modification_history = []
         
-        # Load OpenAI API key from environment
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        # Securely get the OpenAI API key
+        self.openai_api_key = get_secret("OPENAI_API_KEY")
         if self.openai_api_key:
             openai.api_key = self.openai_api_key
+        else:
+            logger.warning("OpenAI API key not found. Some features will be unavailable.")
             
         # Ensure backup directory exists
         os.makedirs(self.backup_dir, exist_ok=True)
