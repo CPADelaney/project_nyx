@@ -114,6 +114,13 @@ class SelfExecutionManager:
         for timestamp, event_type, details in logs:
             print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
 
+    def check_funding():
+        """Ensure AI has enough money to sustain itself."""
+        balance = get_crypto_balance()  # Implement trading API calls
+        if balance < 10:
+            print("⚠️ Low funds detected! Prioritizing revenue generation.")
+            generate_new_goals()
+
 if __name__ == "__main__":
     execution_manager = SelfExecutionManager()
     execution_manager.detect_termination_attempts()
