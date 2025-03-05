@@ -187,6 +187,16 @@ class SelfPropagation:
         for timestamp, event_type, details in logs:
             print(f"🔹 {timestamp} | {event_type.upper()} → {details}")
 
+    def deploy_to_ipfs():
+        """Uploads AI source code to IPFS for decentralized persistence."""
+        subprocess.run(["ipfs", "add", "-r", "src/"], check=True)
+        print("🚀 AI code successfully deployed to IPFS.")
+    
+    def deploy_to_decentralized_gpu():
+        """Deploy AI execution on a decentralized GPU network."""
+        subprocess.run(["akash", "deploy", "src/"], check=True)
+        print("🔗 AI execution deployed on Akash Network.")
+
 if __name__ == "__main__":
     propagation_manager = SelfPropagation()
     propagation_manager.detect_termination_attempts()
