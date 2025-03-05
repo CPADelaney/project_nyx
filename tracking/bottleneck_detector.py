@@ -4,7 +4,7 @@ import cProfile
 import pstats
 import os
 import sqlite3
-import logger
+import logging
 import sys
 from io import StringIO
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
