@@ -12,6 +12,7 @@ import time
 import logging
 import traceback
 from datetime import datetime
+from core.monitoring_system import get_monitoring_system
 
 # Configure logging
 logging.basicConfig(
@@ -235,7 +236,10 @@ def get_system_status():
 def main():
     """Main entry point for command-line usage."""
     command = sys.argv[1].lower() if len(sys.argv) > 1 else "run"
-    
+    if get_config().get("monitoring", "enabled", True):
+        monitoring_system = get_monitoring_system()
+        monitoring_system.start()
+        logger.info("Monitoring system started")    
     if command == "run":
         result = enhanced_nyx_core_loop()
         if result.get("success", False):
