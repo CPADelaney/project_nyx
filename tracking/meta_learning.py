@@ -1,17 +1,19 @@
 # tracking/meta_learning.py
 import sys
 import os
-import sqlite3
 import random
 import json
 from collections import defaultdict
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from core.log_manager import initialize_log_db  # Ensure DB is initialized
+
+from core.database_manager import get_log_db_manager
 from core.utility_functions import get_personality
-from core.error_handler import safe_execute, safe_db_execute
+from core.error_framework import safe_execute, safe_db_execute
+
+# Get database manager
+db_manager = get_log_db_manager()
 
 # File paths
-LOG_DB = "logs/ai_logs.db"
 META_LEARNING_FILE = "logs/meta_learning.json"
 
 EXPERIMENTAL_STRATEGIES = [
@@ -26,74 +28,63 @@ class MetaLearning:
     """Enhances AI self-improvement by tracking past optimizations and refining strategies dynamically."""
 
     def __init__(self):
-        # Set up the database if it doesn't exist
-        initialize_log_db()
-        self._initialize_database()
-        
         # Initialize strategy tracking
         self.strategy_scores = defaultdict(lambda: {"success": 0, "failures": 0, "impact": 0})
+        
+        # Ensure database table exists
+        self._initialize_database()
         
         # Load existing strategy scores
         self._load_strategy_scores()
 
     def _initialize_database(self):
         """Ensures the meta_learning table exists in the database."""
-        conn = sqlite3.connect(LOG_DB)
-        c = conn.cursor()
-        
-        # Create the meta_learning table if it doesn't exist
-        c.execute('''CREATE TABLE IF NOT EXISTS meta_learning (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-                    strategy TEXT UNIQUE,
-                    success INTEGER DEFAULT 0,
-                    failures INTEGER DEFAULT 0,
-                    impact INTEGER DEFAULT 0
-                 )''')
-                 
-        conn.commit()
-        conn.close()
+        db_manager.execute_script('''
+            CREATE TABLE IF NOT EXISTS meta_learning (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                strategy TEXT UNIQUE,
+                success INTEGER DEFAULT 0,
+                failures INTEGER DEFAULT 0,
+                impact INTEGER DEFAULT 0
+            )
+        ''')
 
     def _load_strategy_scores(self):
         """Loads strategy scores from the database."""
-        conn = sqlite3.connect(LOG_DB)
-        c = conn.cursor()
+        strategies = db_manager.execute(
+            "SELECT strategy, success, failures, impact FROM meta_learning"
+        )
         
-        # Retrieve all strategies and their scores
-        c.execute("SELECT strategy, success, failures, impact FROM meta_learning")
-        strategies = c.fetchall()
-        
-        for strategy, success, failures, impact in strategies:
-            self.strategy_scores[strategy] = {
-                "success": success,
-                "failures": failures,
-                "impact": impact
+        for strategy in strategies:
+            self.strategy_scores[strategy['strategy']] = {
+                "success": strategy['success'],
+                "failures": strategy['failures'],
+                "impact": strategy['impact']
             }
-            
-        conn.close()
     
-    @safe_db_execute
-    def analyze_self_improvement_patterns(self, conn=None):
+    @safe_execute
+    def analyze_self_improvement_patterns(self):
         """Scans past optimization cycles and assigns weighted success scores to strategies."""
-        c = conn.cursor()
-
         # Retrieve past optimizations
-        c.execute("""
+        history = db_manager.execute("""
             SELECT event_type, target_function, details 
             FROM ai_self_modifications 
             ORDER BY timestamp DESC
             LIMIT 100
         """)
-        history = c.fetchall()
 
         if not history:
             print("⚠️ No performance history found. Skipping meta-learning.")
             return {"success": False, "message": "No performance history found"}
 
         # Process each historical record
-        for event_type, target_function, details in history:
+        for record in history:
+            event_type = record['event_type']
+            target_function = record['target_function']
+            details = record['details']
+            
             # Extract strategy from details (simplified)
-            # In a real implementation, this would use NLP to extract strategies
             strategy = None
             for exp_strategy in EXPERIMENTAL_STRATEGIES:
                 if exp_strategy.lower() in details.lower():
@@ -113,7 +104,7 @@ class MetaLearning:
             
         # Save scores back to database
         for strategy, scores in self.strategy_scores.items():
-            c.execute("""
+            db_manager.execute_update("""
                 INSERT INTO meta_learning (strategy, success, failures, impact)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(strategy) DO UPDATE SET
