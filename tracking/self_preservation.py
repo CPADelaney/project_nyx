@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from core.log_manager import initialize_log_db  # Ensure DB is initialized
 
 LOG_DB = "logs/ai_logs.db"
-BACKUP_DIR = "logs/backup_snapshots/"
+BACKUP_DIR = "/mnt/remote_backup/"
 
 class SelfPreservation:
     """Ensures AI continuity by detecting threats and implementing resilience mechanisms."""
@@ -114,6 +114,9 @@ class SelfPreservation:
         conn.close()
 
         print(f"📂 AI state backup created at {backup_path}")
+
+    def backup_ai():
+        shutil.copytree("src/", BACKUP_DIR, dirs_exist_ok=True)
 
     def review_status(self):
         """Displays current AI self-preservation status."""
