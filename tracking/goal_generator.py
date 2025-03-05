@@ -45,6 +45,7 @@ class GoalGenerator:
     def generate_new_goals():
         """AI self-improvement & security tasks."""
         goals = [
+            "Generate passive income streams.",
             "Improve execution efficiency.",
             "Enhance security and resilience.",
             "Optimize code for scalability.",
