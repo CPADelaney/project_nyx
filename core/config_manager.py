@@ -2,7 +2,7 @@
 
 """
 Configuration manager for the Nyx system.
-Provides centralized configuration with safe defaults and user overrides.
+Refactored to use dependency injection rather than Singleton pattern.
 """
 
 import os
@@ -10,6 +10,7 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import Dict, Any, Optional, Union
 
 # Configure logging
 logging.basicConfig(
@@ -78,8 +79,9 @@ DEFAULT_CONFIG = {
     "api": {
         "openai_enabled": False,          # Default to False until key is provided
         "max_token_usage": 1000
-    }
+    },
 
+    # Monitoring settings
     "monitoring": {
         "enabled": True,
         "resource_interval": 60,     # Seconds between resource checks
@@ -95,58 +97,48 @@ DEFAULT_CONFIG = {
     }
 }
 
-# Path to user configuration
-CONFIG_PATH = "config/nyx_config.json"
-
 class ConfigManager:
     """Manages configuration for the Nyx system with safe defaults."""
     
-    _instance = None
-    
-    def __new__(cls):
-        """Singleton pattern to ensure only one instance exists."""
-        if cls._instance is None:
-            cls._instance = super(ConfigManager, cls).__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
-    
-    def __init__(self):
-        """Initialize the configuration manager."""
-        if self._initialized:
-            return
-            
+    def __init__(self, config_path: str = "config/nyx_config.json"):
+        """
+        Initialize the configuration manager.
+        
+        Args:
+            config_path: Path to the configuration file
+        """
+        self.config_path = config_path
         self.config = DEFAULT_CONFIG.copy()
         self._load_config()
-        self._initialized = True
     
-    def _load_config(self):
+    def _load_config(self) -> None:
         """Load configuration from file, with fallback to defaults."""
-        if os.path.exists(CONFIG_PATH):
+        if os.path.exists(self.config_path):
             try:
-                with open(CONFIG_PATH, "r") as f:
+                with open(self.config_path, "r") as f:
                     user_config = json.load(f)
                 
                 # Merge user config with defaults (not overwriting the entire sections)
                 self._merge_config(self.config, user_config)
-                logger.info(f"Loaded configuration from {CONFIG_PATH}")
+                logger.info(f"Loaded configuration from {self.config_path}")
             except Exception as e:
-                logger.error(f"Error loading configuration from {CONFIG_PATH}: {str(e)}")
+                logger.error(f"Error loading configuration from {self.config_path}: {str(e)}")
                 logger.info("Using default configuration")
         else:
             # Create the config directory if it doesn't exist
-            os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
             
             # Save the default configuration
             self.save_config()
-            logger.info(f"Created default configuration at {CONFIG_PATH}")
+            logger.info(f"Created default configuration at {self.config_path}")
     
-    def _merge_config(self, target, source):
+    def _merge_config(self, target: Dict[str, Any], source: Dict[str, Any]) -> None:
         """
         Recursively merge source into target.
         
         Args:
-            target (dict): Target dictionary to merge into
-            source (dict): Source dictionary to merge from
+            target: Target dictionary to merge into
+            source: Source dictionary to merge from
         """
         for key, value in source.items():
             if key in target and isinstance(target[key], dict) and isinstance(value, dict):
@@ -156,29 +148,34 @@ class ConfigManager:
                 # Overwrite or add simple values
                 target[key] = value
     
-    def save_config(self):
-        """Save current configuration to file."""
+    def save_config(self) -> bool:
+        """
+        Save current configuration to file.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
         try:
             # Create the config directory if it doesn't exist
-            os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
             
-            with open(CONFIG_PATH, "w") as f:
+            with open(self.config_path, "w") as f:
                 json.dump(self.config, f, indent=4)
             
-            logger.info(f"Saved configuration to {CONFIG_PATH}")
+            logger.info(f"Saved configuration to {self.config_path}")
             return True
         except Exception as e:
-            logger.error(f"Error saving configuration to {CONFIG_PATH}: {str(e)}")
+            logger.error(f"Error saving configuration to {self.config_path}: {str(e)}")
             return False
     
-    def get(self, section, key=None, default=None):
+    def get(self, section: str, key: Optional[str] = None, default: Any = None) -> Any:
         """
         Get a configuration value.
         
         Args:
-            section (str): Configuration section
-            key (str, optional): Configuration key within section
-            default (any, optional): Default value if key not found
+            section: Configuration section
+            key: Configuration key within section (optional)
+            default: Default value if key not found
             
         Returns:
             The configuration value, or default if not found
@@ -191,14 +188,14 @@ class ConfigManager:
             
         return self.config[section].get(key, default)
     
-    def set(self, section, key, value):
+    def set(self, section: str, key: str, value: Any) -> bool:
         """
         Set a configuration value and save to file.
         
         Args:
-            section (str): Configuration section
-            key (str): Configuration key within section
-            value (any): Value to set
+            section: Configuration section
+            key: Configuration key within section
+            value: Value to set
             
         Returns:
             bool: True if successful, False otherwise
@@ -227,12 +224,12 @@ class ConfigManager:
         # Save the configuration
         return self.save_config()
     
-    def is_feature_enabled(self, feature):
+    def is_feature_enabled(self, feature: str) -> bool:
         """
         Check if a feature is enabled.
         
         Args:
-            feature (str): Feature name
+            feature: Feature name
             
         Returns:
             bool: True if enabled, False otherwise
@@ -256,7 +253,7 @@ class ConfigManager:
         section, key = feature_map[feature]
         return self.get(section, key, False)
     
-    def get_resource_limits(self):
+    def get_resource_limits(self) -> Dict[str, Any]:
         """
         Get resource limits.
         
@@ -265,7 +262,7 @@ class ConfigManager:
         """
         return self.get("resources")
     
-    def get_log_level(self):
+    def get_log_level(self) -> str:
         """
         Get log level.
         
@@ -274,7 +271,7 @@ class ConfigManager:
         """
         return self.get("system", "log_level", "INFO")
     
-    def reset_to_defaults(self):
+    def reset_to_defaults(self) -> bool:
         """
         Reset configuration to defaults.
         
@@ -290,30 +287,45 @@ class ConfigManager:
         self.config = DEFAULT_CONFIG.copy()
         return self.save_config()
 
-# Global instance
-config = ConfigManager()
-
-def get_config():
+def create_config_manager(config_path: str = "config/nyx_config.json") -> ConfigManager:
     """
-    Get the global configuration manager instance.
+    Create a new ConfigManager instance.
+    
+    Args:
+        config_path: Path to the configuration file
     
     Returns:
-        ConfigManager: Global configuration manager instance
+        ConfigManager: A new ConfigManager instance
     """
-    return config
+    return ConfigManager(config_path)
 
-# Helper function to check if a feature is enabled
-def is_feature_enabled(feature):
+# For backward compatibility, but not encouraged
+_default_config = None
+
+def get_config() -> ConfigManager:
+    """
+    Get the default configuration manager instance.
+    
+    Returns:
+        ConfigManager: Default configuration manager instance
+    """
+    global _default_config
+    if _default_config is None:
+        _default_config = create_config_manager()
+    return _default_config
+
+# Helper function to check if a feature is enabled (using the default config manager)
+def is_feature_enabled(feature: str) -> bool:
     """
     Check if a feature is enabled.
     
     Args:
-        feature (str): Feature name
+        feature: Feature name
         
     Returns:
         bool: True if enabled, False otherwise
     """
-    return config.is_feature_enabled(feature)
+    return get_config().is_feature_enabled(feature)
 
 if __name__ == "__main__":
     # Command-line interface for configuration management
@@ -322,6 +334,7 @@ if __name__ == "__main__":
         sys.exit(1)
         
     command = sys.argv[1].lower()
+    config = get_config()
     
     if command == "get":
         if len(sys.argv) < 3:
