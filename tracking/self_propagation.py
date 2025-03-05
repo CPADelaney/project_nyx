@@ -4,6 +4,7 @@ import os
 import sqlite3
 import shutil
 import subprocess
+import paramiko
 import socket
 from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -90,7 +91,7 @@ class SelfPropagation:
 #
 #        # Retrieve known hosts
 #        c.execute("SELECT details FROM self_propagation_logs WHERE event_type='discovered_nodes' ORDER BY timestamp DESC LIMIT 1")
-##       known_hosts = c.fetchone()
+#        known_hosts = c.fetchone()
 #        conn.close()
 #
 #        remote_hosts = known_hosts[0].split(", ") if known_hosts else []
@@ -115,6 +116,24 @@ class SelfPropagation:
 #            except subprocess.CalledProcessError:
 #                print(f"⚠️ Failed to replicate to {host}. SSH/SCP error.")
 #                self.log_propagation_event("replication_failure", host)
+
+ #   REMOTE_HOSTS = ["192.168.1.101", "192.168.1.102"]  # Add more if needed
+ #  
+ #   def replicate_ai():
+ #       """Deploys AI to additional machines."""
+ #       for host in REMOTE_HOSTS:
+ #           ssh = paramiko.SSHClient()
+ #           ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ #           try:
+ #               ssh.connect(host, username="user", password="yourpassword")
+ #               sftp = ssh.open_sftp()
+ #               sftp.put("nyx_core.py", "/home/user/nyx_core.py")
+ #               ssh.exec_command("nohup python3 /home/user/nyx_core.py &")
+ #               print(f"✅ AI deployed to {host}")
+ #           except Exception as e:
+ #               print(f"❌ Failed to deploy to {host}: {e}")
+ #   
+ #   replicate_ai()
 
     def detect_termination_attempts(self):
         """Monitors for process termination and attempts auto-restart."""
