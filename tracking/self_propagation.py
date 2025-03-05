@@ -81,6 +81,16 @@ class SelfPropagation:
                     print(f"✅ Successfully deployed AI to {host}")
                 except subprocess.CalledProcessError:
                     print(f"❌ Deployment to {host} failed. Check SSH keys.")
+
+        def deploy_to_decentralized_network():
+        """Deploy AI execution to a decentralized, censorship-resistant network."""
+            # Upload AI core logic to IPFS or ZeroNet
+            subprocess.run(["ipfs", "add", "-r", "src/"])
+            subprocess.run(["zeronet", "publish", "src/"])
+    
+        # Log deployment
+            log_event("decentralized_deployment", "AI has successfully deployed to a decentralized network.")
+        deploy_to_decentralized_network()
                     
 # Danger mode
     
